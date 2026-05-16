@@ -1,0 +1,110 @@
+{
+  "definitions": [
+    {
+      "id": "hello-21",
+      "name": "Hello, 21",
+      "xp": 50,
+      "description": "First record + sealed interface in P2.",
+      "criteria": "grep -rE 'sealed (interface|class)' projects/p2-loan-core-modern/src/main/java has >=1 match AND day-06 verification all_passed"
+    },
+    {
+      "id": "sealed-fate",
+      "name": "Sealed Fate",
+      "xp": 75,
+      "description": "Model a domain union with a non-trivial sealed hierarchy (>=3 permits).",
+      "criteria": "any sealed interface or class in projects/p[2-9]-*/src/main/java has >=3 permitted types"
+    },
+    {
+      "id": "pattern-master",
+      "name": "Pattern Master",
+      "xp": 75,
+      "description": "Replace 5+ instanceof chains with pattern switches.",
+      "criteria": "grep -rE 'switch \\(.+\\) \\{' projects/p[2-9]-*/src/main/java with case-of pattern arms >=5 across project"
+    },
+    {
+      "id": "hex-vex",
+      "name": "Hex Vex",
+      "xp": 100,
+      "description": "Pass ArchUnit hexagonal-boundary test in P3.",
+      "criteria": "mvn -pl projects/p3-loan-domain-hex test -Dtest=*Architecture* exits 0"
+    },
+    {
+      "id": "bounded",
+      "name": "Bounded",
+      "xp": 75,
+      "description": "Aggregate root with enforced invariants AND property tests covering them.",
+      "criteria": "p3 has class implementing AggregateRoot AND jqwik @Property tests covering its invariants"
+    },
+    {
+      "id": "outbox-hero",
+      "name": "Outbox Hero",
+      "xp": 100,
+      "description": "Transactional outbox loses no message under chaos test.",
+      "criteria": "p5 has an outbox table migration AND a passing chaos test that survives a forced rollback"
+    },
+    {
+      "id": "idempotent-mind",
+      "name": "Idempotent Mind",
+      "xp": 75,
+      "description": "Payment retry test passes 100x without duplication.",
+      "criteria": "p6 has a 100-iteration retry test that asserts exactly-once application of a Payment"
+    },
+    {
+      "id": "contract-killer",
+      "name": "Contract Killer",
+      "xp": 75,
+      "description": "First green Spring Cloud Contract.",
+      "criteria": "mvn -pl projects/p6-payments-service test passes contract verifier tests"
+    },
+    {
+      "id": "loom-lord",
+      "name": "Loom Lord",
+      "xp": 100,
+      "description": "Measurable throughput win from virtual threads, charted.",
+      "criteria": "p8 contains a benchmark report showing >2x throughput on virtual vs platform threads"
+    },
+    {
+      "id": "container-diet",
+      "name": "Container Diet",
+      "xp": 50,
+      "description": "Java app image under 120MB.",
+      "criteria": "jib-produced image for any p7+ service is <120MB"
+    },
+    {
+      "id": "kubectl-karma",
+      "name": "kubectl Karma",
+      "xp": 75,
+      "description": "Full stack green on kind from a cold cluster.",
+      "criteria": "kind cluster created then helm install completes AND kubectl get pods shows all Ready"
+    },
+    {
+      "id": "terraform-tamer",
+      "name": "Terraform Tamer",
+      "xp": 75,
+      "description": "terraform plan is clean on the second run (no churn).",
+      "criteria": "two consecutive terraform plans show 0 changes in envs/dev"
+    },
+    {
+      "id": "localstack-whisperer",
+      "name": "LocalStack Whisperer",
+      "xp": 50,
+      "description": "Full integration suite green against LocalStack.",
+      "criteria": "p9 integration tests pass against envs/localstack"
+    },
+    {
+      "id": "chaos-survivor",
+      "name": "Chaos Survivor",
+      "xp": 150,
+      "description": "Capstone chaos drill passes.",
+      "criteria": "day-30 verification all_passed AND no payment lost in chaos run"
+    },
+    {
+      "id": "the-quarkus-question",
+      "name": "The Quarkus Question",
+      "xp": 100,
+      "description": "Complete 3+ Quarkus side quests and write a comparison ADR.",
+      "criteria": ">=3 of SQ-01..SQ-04 marked done AND curriculum/adr/ contains a quarkus comparison ADR"
+    }
+  ],
+  "unlocked": []
+}
