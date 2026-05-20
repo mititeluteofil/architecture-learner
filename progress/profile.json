@@ -1,0 +1,16 @@
+{
+  "current_day": 1,
+  "current_project": "p1-loan-core-java8",
+  "xp_total": 0,
+  "level": {
+    "id": "L1",
+    "name": "Apprentice",
+    "xp_in_level": 0,
+    "xp_to_next": 300
+  },
+  "streak_days": 0,
+  "started_at": null,
+  "last_session_at": null,
+  "achievements_unlocked": 0,
+  "achievements_total": 15
+}

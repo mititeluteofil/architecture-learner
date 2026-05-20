@@ -1,0 +1,60 @@
+# Maven
+target/
+.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.ear
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.eclipse/
+.project
+.classpath
+.settings/
+out/
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Docker / k8s scratch
+docker-compose.override.yml
+.kube/
+
+# LocalStack
+.localstack/
+volume/
+
+# Secrets
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+
+# Test artifacts
+*.exec
+build/
+reports/
