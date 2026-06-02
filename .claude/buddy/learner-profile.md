@@ -1,18 +1,20 @@
 # Learner Profile
 
-_Last updated: pre-Day-1 (initial)_
+_Last updated: 2026-05-30_
 
 ## Pace
-Day 0. No sessions logged yet.
+On Day 1 of 30. First session logged. Spent ~115 min against a ~150 min planned session; slightly under target, with the full session budget consumed by design documentation rather than implementation.
 
 ## Style
-Unknown. To be observed over the first 3 sessions.
+Documentation-first. Writes architectural decisions explicitly before touching code — reads the spec and internalizes the "why" before drilling into mechanics. Top-down orientation: domain reasoning precedes implementation detail.
 
 ## Strengths
-- _(to be filled after the first debrief)_
+- Writes thorough, well-reasoned decision records with explicit trade-off analysis
+- Frames domain constraints correctly — invalid operations belong in the type, not the caller
+- Separates domain concerns from application-layer orchestration cleanly in written reasoning
 
 ## Recurring blind spots
-- _(to be filled after the first debrief)_
+- Tends to spend the full session budget on design and documentation, leaving implementation unstarted — may benefit from timeboxing the planning phase
 
 ## Decisions style
-Unknown.
+Slow and thorough before committing. Weighs multiple options with explicit rationale, writes them up formally, and only then moves toward code. Evidence-driven rather than gut-first.

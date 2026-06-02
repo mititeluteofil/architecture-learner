@@ -1,11 +1,24 @@
 {
-  "generated_at": null,
-  "xp_timeseries": [],
-  "minutes_timeseries": [],
-  "goal_completion_rate_by_session": [],
+  "generated_at": "2026-05-30",
+  "xp_timeseries": [
+    { "date": "2026-05-30", "session": 1, "xp_earned": 175, "xp_total": 175 }
+  ],
+  "minutes_timeseries": [
+    { "date": "2026-05-30", "session": 1, "duration_minutes": 115, "planned_minutes": 150 }
+  ],
+  "goal_completion_rate_by_session": [
+    { "session": 1, "day": 1, "goals_done": 2, "goals_total": 5, "rate": 0.4 }
+  ],
   "achievements_timeline": [],
-  "open_blockers": [],
-  "recent_decisions": [],
-  "streak_days": 0,
-  "level_progression": []
+  "open_blockers": [
+    { "session": 1, "text": "Time — did not reach code implementation (Loan, Money, tests)", "resolved": false }
+  ],
+  "recent_decisions": [
+    { "session": 1, "summary": "ADR-0001: Throw on currency mismatch; application layer owns orchestration." },
+    { "session": 1, "summary": "ADR-0002: LoanId wraps UUID v7 with static factory method." }
+  ],
+  "streak_days": 1,
+  "level_progression": [
+    { "date": "2026-05-30", "level_id": "L1", "level_name": "Apprentice", "xp_total": 175 }
+  ]
 }

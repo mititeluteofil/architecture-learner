@@ -12,7 +12,7 @@
     <description>30-day Java + Spring Boot + Cloud learning series. One domain, nine projects.</description>
 
     <modules>
-        <!-- Projects are added lazily by /kickoff p<N>. Day 0 has no modules yet. -->
+        <module>projects/p1-loan-core-java8</module>
     </modules>
 
     <properties>
