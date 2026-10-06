@@ -1,0 +1,33 @@
+{
+  "session": 1,
+  "day": 1,
+  "project": "p1-loan-core-java8",
+  "date": "2026-05-30",
+  "duration_minutes": 115,
+  "planned_minutes": 150,
+  "xp_earned": 175,
+  "events": ["debrief", "adr", "adr"],
+  "main_quest": {
+    "goals": [
+      { "id": "kickoff", "description": "Run /kickoff p1", "status": "done" },
+      { "id": "write-adrs", "description": "Review PLAN.md and write ADRs before code", "status": "done" },
+      { "id": "implement-loan", "description": "Implement Loan aggregate", "status": "not_started" },
+      { "id": "implement-money", "description": "Implement Money value object", "status": "not_started" },
+      { "id": "tests-pass", "description": "Make unit tests pass", "status": "not_started" }
+    ]
+  },
+  "decisions": [
+    "ADR-0001: Throw CurrencyMismatchException on currency mismatch; application layer owns fetch-convert-retry orchestration, keeping domain pure.",
+    "ADR-0002: LoanId wraps UUID v7 (time-sortable) with static factory method for encapsulation; callers never construct raw identifiers."
+  ],
+  "blockers": ["Time — did not reach code implementation (Loan, Money, tests)"],
+  "side_quests": [],
+  "verification": { "all_passed": false },
+  "reflection": "Q1: today I spent almost 2 hrs completing 2 ADRs. the other 2 points are not necessarily addressed. Q2: I didn't get to it yet. Q3: it was part of the scaffolding, but it makes sense as there are accounts that can have less than 0 -> for a loan it would be like a last payment with more than you owed. Functionally it shouldn't be allowed. Rather not allowing it from a client -> therefore an exception should be thrown. - so always invalid in the end",
+  "buddy_questions_asked": [
+    "What did you attempt today, and how far did you get?",
+    "The Loan constructor accepts both a principal and an outstandingBalance as separate fields, and there is a LEARNER: marker asking you to define construction invariants. Before writing anything — what relationship, if any, do you think should hold between those two values at the moment a Loan is first created, and why does the domain care?",
+    "The Money.subtract marker asks you to decide whether subtracting below zero is always invalid or sometimes part of a transition workflow. What specific Loan lifecycle event, visible in the methods on Loan.java, made you lean one way or the other on that question?"
+  ],
+  "achievements_unlocked": []
+}
