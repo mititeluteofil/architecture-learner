@@ -1,0 +1,41 @@
+name: Sync Documentation
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  update-docs:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: JetBrains/junie-github-action@v1
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          create_new_branch_for_pr: "true"
+          prompt: |
+            Review pr diff and update documentation to match code changes.
+
+            **Check for outdated docs:**
+            - README.md examples using changed APIs
+            - API documentation (JSDoc, docstrings, OpenAPI)
+            - Configuration examples (if config changed)
+            - Migration guides (for breaking changes)
+
+            **Update only if needed:**
+            - Keep examples simple and runnable
+            - Show before/after for breaking changes
+            - Add "Added in vX.X" for new features
+            - Only modify documentation files (README.md, docs/**)
+            - If nothing to update, don't make changes
+
+            Procedure:
+            Use git diff origin/${{ github.event.pull_request.base.ref }}... to get a diff of the PR.
