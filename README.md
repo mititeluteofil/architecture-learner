@@ -61,3 +61,16 @@ Then open `curriculum/day-by-day/day-01.md` and run `/kickoff p1` when ready.
 ## Gamification
 
 XP per action, six levels (Apprentice → Architect), fifteen named achievements. State lives in `progress/profile.json`. The Learning Buddy keeps a rolling 7-session summary in `.claude/buddy/session-log.md` and a learner profile that evolves with you.
+
+## Learning Loop (GitHub Actions)
+
+`.github/workflows/learning-loop.yml` runs the same flow in CI, configured by `.github/learning-path.yml` (daily minutes, pace, track, scaffold level, review tone, auto-verify, auto-update-buddy).
+
+| Trigger | What happens |
+|---|---|
+| Run workflow → `plan` / `adjust-plan` | Architect writes/revises `projects/p<N>-…/PLAN.md` and opens a PR — edit it, merge it. |
+| Run workflow → `scaffold-code` / `scaffold-infra` / `scaffold-all` | Code-scaffolder then infra-scaffolder (in that order), as a PR. |
+| Run workflow → `dashboard` | Renders level, XP bar, streak, achievement grid in the run summary. |
+| `git push` of your work | Test-scaffolder (only for touched projects, only missing tests) → CI runs **only the tests added/changed since the last debrief** → learning-focused review (alternatives, ROI, and a roast when it's deserved) → `verify-day` → `award-xp` → `update-buddy` → one dashboard + review comment on your PR (or commit). |
+
+Tests that still `fail("LEARNER: …")` are shown as 🔒 locked quests, not failures. Add a `## Reflection` section to your PR description to feed `update-buddy`. The Learning Buddy (`/buddy`, `/debrief`) stays local. Requires the `JUNIE_API_KEY` repository secret.

@@ -58,3 +58,6 @@ volume/
 *.exec
 build/
 reports/
+
+# Learning Loop workflow scratch output (.github/workflows/learning-loop.yml)
+.learning-out/

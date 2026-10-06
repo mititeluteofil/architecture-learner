@@ -1,0 +1,530 @@
+name: Learning Loop
+
+# The AI-driven learning loop for the 30-day Loan Servicing series.
+#
+#   Manual (Actions → Learning Loop → Run workflow):
+#     plan / adjust-plan  → architect agent writes/revises projects/<p>/PLAN.md (opens a PR = your review gate)
+#     scaffold-code       → code-scaffolder (after the PLAN.md PR is merged)
+#     scaffold-infra      → infra-scaffolder
+#     scaffold-all        → code-scaffolder then infra-scaffolder, in that order
+#     dashboard           → just render your XP / level / achievements dashboard
+#
+#   Automatic, on every push of your work:
+#     test-scaffold → session CI (only the tests touched this session) → learning review
+#                   → verify-day → award-xp → update-buddy → one dashboard + review comment
+#
+#   The Learning Buddy (/buddy, /debrief) deliberately stays LOCAL — Socratic dialogue needs you in the loop.
+#   Tune your path in .github/learning-path.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "Which step of the path to run"
+        required: true
+        default: plan
+        type: choice
+        options: [plan, adjust-plan, scaffold-code, scaffold-infra, scaffold-all, dashboard]
+      project:
+        description: "Project id, e.g. p2 (empty = current_project from progress/profile.json)"
+        required: false
+        default: ""
+      adjustments:
+        description: "adjust-plan only: what to change in PLAN.md (scope, modules, ADR questions, time budget…)"
+        required: false
+        default: ""
+  push:
+    branches-ignore:
+      - "junie/**"
+    paths:
+      - "projects/**"
+      - "curriculum/adr/**"
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+  checks: read
+
+concurrency:
+  group: learning-loop-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BOT_TAG: "[learning-bot]"
+  OUT_DIR: .learning-out
+
+jobs:
+  # ------------------------------------------------------------------ context
+  context:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[learning-bot]') }}
+    outputs:
+      day: ${{ steps.cfg.outputs.day }}
+      day_padded: ${{ steps.cfg.outputs.day_padded }}
+      project: ${{ steps.cfg.outputs.project }}
+      planned_minutes: ${{ steps.cfg.outputs.planned_minutes }}
+      pace: ${{ steps.cfg.outputs.pace }}
+      track: ${{ steps.cfg.outputs.track }}
+      scaffold_level: ${{ steps.cfg.outputs.scaffold_level }}
+      review_tone: ${{ steps.cfg.outputs.review_tone }}
+      auto_verify: ${{ steps.cfg.outputs.auto_verify }}
+      auto_update_buddy: ${{ steps.cfg.outputs.auto_update_buddy }}
+      target_project: ${{ steps.target.outputs.target_project }}
+      push_base: ${{ steps.changes.outputs.push_base }}
+      changed_main_projects: ${{ steps.changes.outputs.changed_main_projects }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read learning path + profile
+        id: cfg
+        run: python3 .github/scripts/learning_loop.py config
+
+      - name: Resolve target project
+        id: target
+        env:
+          INPUT_PROJECT: ${{ github.event.inputs.project }}
+          CURRENT_PROJECT: ${{ steps.cfg.outputs.project }}
+        run: echo "target_project=${INPUT_PROJECT:-$CURRENT_PROJECT}" >> "$GITHUB_OUTPUT"
+
+      - name: Detect projects whose production code changed in this push
+        id: changes
+        if: ${{ github.event_name == 'push' }}
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            BEFORE=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD~1)
+          fi
+          echo "push_base=$BEFORE" >> "$GITHUB_OUTPUT"
+          projects=$(git diff --name-only "$BEFORE" HEAD -- projects | grep '/src/main/' | cut -d/ -f2 | sort -u | paste -sd, - || true)
+          echo "changed_main_projects=$projects" >> "$GITHUB_OUTPUT"
+          echo "Production code changed in: ${projects:-<none>}"
+
+      - name: Dashboard (before this run)
+        run: python3 .github/scripts/learning_loop.py dashboard --out "$OUT_DIR/dashboard-before.md" --title "🎮 Learning Loop — where you stand"
+
+  # ------------------------------------------------------------------ manual: plan with architect
+  plan:
+    needs: context
+    if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.stage == 'plan' || github.event.inputs.stage == 'adjust-plan') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Architect → PLAN.md
+        uses: JetBrains/junie-github-action@v1
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          create_new_branch_for_pr: "true"
+          prompt: |
+            You are the ARCHITECT of this learning repository. Read and strictly follow `.claude/agents/architect.md`
+            and the repository rules in `CLAUDE.md` (cardinal rule: never write business logic, never fill `// LEARNER:` markers).
+
+            Stage: `${{ github.event.inputs.stage }}`
+            Project: `${{ needs.context.outputs.target_project }}` — resolve the full folder name (`projects/p<N>-<name>`) and the
+            project's first day from `curriculum/00-overview.md`.
+
+            Learner path settings (from `.github/learning-path.yml`):
+            - daily budget: ${{ needs.context.outputs.planned_minutes }} min, pace: ${{ needs.context.outputs.pace }}, track: ${{ needs.context.outputs.track }}
+            - scaffold level: ${{ needs.context.outputs.scaffold_level }}
+              (thorough = full skeleton manifest; minimal = module/pom/acceptance tests only, learner designs ports & packages;
+               contract-only = only ArchUnit rules + contract/acceptance tests in the manifest)
+
+            Read first: `curriculum/day-by-day/day-NN.md` for the project's days (if present), the previous project's `PLAN.md`,
+            `.claude/buddy/overview.md`, and the learner's ADRs in `curriculum/adr/` (respect decisions already taken).
+
+            If stage is `plan`: write the plan to `projects/<folder>/PLAN.md`.
+            If stage is `adjust-plan`: revise the EXISTING `projects/<folder>/PLAN.md` applying ONLY these learner adjustments,
+            and append a short "## Revision log" entry describing what changed and why:
+            ---
+            ${{ github.event.inputs.adjustments }}
+            ---
+            Add a "## Time budget" section that splits the project's work into sessions that fit the daily budget above
+            (Phase A: design & domain core, Phase B: adapters & verification).
+
+            Only create/modify `projects/<folder>/PLAN.md`. Do not touch progress/, .claude/buddy/, or any Java source.
+            PR title: "📐 PLAN ${{ needs.context.outputs.target_project }} (${{ github.event.inputs.stage }})". In the PR body list the ADR
+            questions and say: "Review/edit PLAN.md, merge, then run Learning Loop → scaffold-all".
+
+  # ------------------------------------------------------------------ manual: scaffold code & infra (ordered)
+  scaffold:
+    needs: context
+    if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.stage, 'scaffold-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Guard — PLAN.md must exist
+        env:
+          TARGET: ${{ needs.context.outputs.target_project }}
+        run: |
+          if ! ls projects/${TARGET}-*/PLAN.md >/dev/null 2>&1 && ! ls projects/${TARGET}/PLAN.md >/dev/null 2>&1; then
+            echo "::error::No PLAN.md for ${TARGET}. Run Learning Loop with stage=plan first and merge its PR."
+            exit 1
+          fi
+
+      - name: Scaffold (code-scaffolder → infra-scaffolder)
+        uses: JetBrains/junie-github-action@v1
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          create_new_branch_for_pr: "true"
+          prompt: |
+            You are the SCAFFOLDING SWARM orchestrator for this learning repository. Obey `CLAUDE.md`: generate skeletons only,
+            leave `// LEARNER: <hint>` (Java) and `# LEARNER: <hint>` (infra) markers, NEVER write business logic.
+
+            Project: `${{ needs.context.outputs.target_project }}` (resolve folder from `curriculum/00-overview.md`), plan: its `PLAN.md`.
+            Stage: `${{ github.event.inputs.stage }}`. Scaffold level: `${{ needs.context.outputs.scaffold_level }}`
+            (thorough = everything in the manifest; minimal = module, pom.xml, package dirs and acceptance-level stubs only;
+             contract-only = module + pom.xml only, no production stubs).
+
+            Run the phases strictly in this order, skipping those not selected by the stage:
+            1. code-scaffolder (stages scaffold-code, scaffold-all): follow `.claude/agents/code-scaffolder.md` exactly, register
+               the module in the root `pom.xml`, then run `mvn -B -pl projects/<folder> -am compile` as a smoke check.
+            2. infra-scaffolder (stages scaffold-infra, scaffold-all): follow `.claude/agents/infra-scaffolder.md` exactly.
+               Do NOT modify `.github/workflows/learning-loop.yml` or `.github/scripts/`.
+
+            Do NOT run the test-scaffolder — it runs automatically after the learner pushes.
+            Do NOT award XP and do not touch progress/ or .claude/buddy/ — scaffolding is not progress.
+            PR title: "🏗️ Scaffold ${{ needs.context.outputs.target_project }} (${{ github.event.inputs.stage }})". PR body: a table of
+            files added, `LEARNER:` marker count per phase, compile result, and which ADR questions the markers relate to.
+
+  # ------------------------------------------------------------------ push: test-scaffolder
+  test-scaffold:
+    needs: context
+    if: ${{ github.event_name == 'push' && needs.context.outputs.changed_main_projects != '' }}
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Test-scaffolder for the projects you touched
+        uses: JetBrains/junie-github-action@v1
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          create_new_branch_for_pr: "false"
+          prompt: |
+            You are the TEST-SCAFFOLDER. Read and strictly follow `.claude/agents/test-scaffolder.md` and `CLAUDE.md`.
+
+            Scope: ONLY these project folders under `projects/`: `${{ needs.context.outputs.changed_main_projects }}`.
+            Changed production files this push: run `git diff --name-only ${{ needs.context.outputs.push_base }} HEAD -- projects`.
+
+            Be idempotent: generate test skeletons ONLY for production types (or new behaviours visible in their javadoc /
+            `// LEARNER:` hints / PLAN.md) that have no corresponding test yet. Never rewrite, rename or delete existing tests —
+            the learner may already have filled them in. Bodies are always `fail("LEARNER: <hint>")`.
+            Never edit anything under `src/main`. If nothing is missing, change nothing.
+            Confirm compilation with `mvn -B -pl projects/<folder> -am test-compile` (use `-f projects/<folder>/pom.xml` if the
+            module is not registered in the root pom). Do not commit or push — the workflow commits for you.
+
+      - name: Commit test skeletons
+        id: commit
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          git config user.name "learning-loop[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- ':(glob)projects/**/src/test/**'
+          if ! git diff --cached --quiet; then
+            git commit -m "test: scaffold session test skeletons ${BOT_TAG}"
+            git pull --rebase origin "$BRANCH"
+            git push origin "HEAD:$BRANCH"
+          else
+            echo "No new test skeletons needed."
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  # ------------------------------------------------------------------ push: CI for this session's tests only
+  session-ci:
+    needs: [context, test-scaffold]
+    if: ${{ always() && github.event_name == 'push' && needs.context.result == 'success' && needs.test-scaffold.result != 'failure' }}
+    runs-on: ubuntu-latest
+    outputs:
+      base: ${{ steps.select.outputs.base }}
+      head: ${{ steps.head.outputs.sha }}
+      has_tests: ${{ steps.select.outputs.has_tests }}
+      projects: ${{ steps.select.outputs.projects }}
+      real_failures: ${{ steps.run.outputs.real_failures }}
+      locked: ${{ steps.run.outputs.locked }}
+      passed: ${{ steps.run.outputs.passed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.test-scaffold.outputs.sha || github.sha }}
+          fetch-depth: 0
+
+      - id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Select tests added/changed this session
+        id: select
+        run: python3 .github/scripts/learning_loop.py session-tests "--base=${{ needs.context.outputs.push_base }}" --head HEAD
+
+      - name: Run only the session's test suite
+        id: run
+        run: python3 .github/scripts/learning_loop.py run-tests
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: session-ci
+          path: ${{ env.OUT_DIR }}/
+          include-hidden-files: true
+
+      - name: Fail on real failures (LEARNER-locked tests are expected, not failures)
+        if: ${{ steps.run.outputs.real_failures != '0' }}
+        run: |
+          echo "::error::${{ steps.run.outputs.real_failures }} real test failure(s)/build error(s) in this session."
+          exit 1
+
+  # ------------------------------------------------------------------ push: learning-focused code review
+  learning-review:
+    needs: [context, session-ci]
+    if: ${{ always() && github.event_name == 'push' && needs.session-ci.result != 'skipped' && needs.session-ci.result != 'cancelled' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.session-ci.outputs.head || github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: session-ci
+          path: ${{ env.OUT_DIR }}
+
+      - name: Learning review
+        uses: JetBrains/junie-github-action@v1
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          create_new_branch_for_pr: "false"
+          prompt: |
+            You are the LEARNING REVIEWER for a senior engineer working through the 30-day Loan Servicing series
+            (DDD, hexagonal, Spring Boot, Kafka, Docker, k8s, Terraform). You review to TEACH, not to gatekeep.
+
+            Inputs:
+            - Session diff: `git diff ${{ needs.session-ci.outputs.base }} ${{ needs.session-ci.outputs.head }}` (ignore commits tagged [learning-bot]
+              and generated `fail("LEARNER: …")` skeletons — review what the LEARNER wrote: code, tests, ADRs in curriculum/adr/).
+            - Session test results: `.learning-out/test-results.json` (passed / locked = unfilled LEARNER tests / failed / build errors).
+            - Day ${{ needs.context.outputs.day }}, project `${{ needs.context.outputs.project }}`; brief in `curriculum/day-by-day/day-${{ needs.context.outputs.day_padded }}.md` if present;
+              the project's `PLAN.md` (its ADR questions are what this session should be answering).
+            - Learner tendencies (read-only, never write): `.claude/buddy/learner-profile.md`.
+            - Daily budget: ${{ needs.context.outputs.planned_minutes }} min. Review tone: `${{ needs.context.outputs.review_tone }}`.
+
+            Write the review in Markdown to `.learning-out/review.md` (this is the ONLY file you may create; do not modify any
+            other file, do not commit, do not push). Structure:
+            ### 🧑‍🏫 Learning review — Day ${{ needs.context.outputs.day }}
+            1. **Verdict** — one line, with a grade S/A/B/C/D/F.
+            2. **What you did well** — concrete, tied to file:line.
+            3. **What will hurt you later** — design/invariant/boundary problems, explained by the principle behind them
+               (aggregate consistency, dependency rule, value-object immutability, idempotency, test design, etc.).
+            4. **Roads not taken** — 2–3 viable alternative designs for the decisions made this session, with trade-offs
+               (when each would be the better choice). Alternatives are fair game AFTER the learner has committed an attempt.
+            5. **Learning ROI** — what this session taught, what concept to deepen next, and one side quest from
+               `curriculum/side-quests/index.md` that is unlocked and relevant.
+            6. **Questions to take to `/buddy`** — 1–3 Socratic questions (the buddy stays local).
+            7. **Time-box check** — given the daily budget and the learner profile's tendencies, was the effort well spent?
+
+            Tone rules:
+            - gentle: encouraging, issues framed as experiments.
+            - honest: direct and specific, no sugar-coating.
+            - menace: be a menace. When something is completely off (business logic in an adapter, invariants enforced by callers,
+              mutable value objects, money as double, tests that assert nothing, `// LEARNER:` markers "solved" by deleting the test,
+              copy-pasted framework code the learner clearly doesn't understand) roast it hard and hand out mock penalties
+              such as "−50 XP (symbolic) for floating-point money". Penalties are ONLY rhetorical — never touch progress/.
+              Stay technically precise; punish the code, never the person; no slurs or personal attacks.
+            Never write the solution: no complete method bodies, no filled-in LEARNER markers. Snippets ≤ 5 lines illustrating
+            a principle are allowed.
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: learning-review
+          path: ${{ env.OUT_DIR }}/review.md
+          if-no-files-found: ignore
+          include-hidden-files: true
+
+  # ------------------------------------------------------------------ push: verify-day → award-xp → update-buddy
+  verify-and-award:
+    needs: [context, session-ci]
+    if: ${{ always() && github.event_name == 'push' && needs.session-ci.result == 'success' && needs.session-ci.outputs.real_failures == '0' && needs.context.outputs.auto_verify == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      all_passed: ${{ steps.verify.outputs.all_passed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: session-ci
+          path: ${{ env.OUT_DIR }}
+
+      - name: Snapshot profile (for the "+XP this run" banner)
+        run: python3 .github/scripts/learning_loop.py snapshot
+
+      - name: Maven wrapper fallback (day files call ./mvnw)
+        run: |
+          if [ ! -x ./mvnw ]; then
+            printf '#!/bin/sh\nexec mvn -B -ntp "$@"\n' > mvnw
+            chmod +x mvnw
+          fi
+
+      - name: verify-day ${{ needs.context.outputs.day_padded }}
+        id: verify
+        run: python3 .github/scripts/learning_loop.py verify --day "${{ needs.context.outputs.day }}"
+
+      - name: Collect reflection (PR body "## Reflection" section, else commit message body)
+        if: ${{ steps.verify.outputs.all_passed == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          HEAD_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          body=$(gh pr list --head "$BRANCH" --state open --json body --jq '.[0].body // ""' 2>/dev/null || true)
+          reflection=$(printf '%s\n' "$body" | awk '/^##+ *Reflection/{f=1;next} /^##/{f=0} f')
+          [ -z "$reflection" ] && reflection=$(printf '%s\n' "$HEAD_MSG" | tail -n +2)
+          printf '%s\n' "$reflection" > "$OUT_DIR/reflection.md"
+
+      - name: award-xp (+ update-buddy)
+        if: ${{ steps.verify.outputs.all_passed == 'true' }}
+        uses: JetBrains/junie-github-action@v1
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          create_new_branch_for_pr: "false"
+          prompt: |
+            Day ${{ needs.context.outputs.day }} verification PASSED in CI. Apply the repository skills exactly as written:
+
+            1. Read and follow `.claude/skills/award-xp/SKILL.md`. Brief:
+               - event: daily_acceptance (plus `adr` for every ADR file added under `curriculum/adr/` in
+                 `git diff --name-only --diff-filter=A ${{ needs.session-ci.outputs.base }} HEAD -- curriculum/adr`)
+               - day: ${{ needs.context.outputs.day }}, project: ${{ needs.context.outputs.project }}
+               - verification: the contents of `.learning-out/verification.json`
+               - planned_minutes: ${{ needs.context.outputs.planned_minutes }}
+               - reflection: contents of `.learning-out/reflection.md` (may be empty)
+               - goals/decisions: derive from the day brief, the session diff and the ADRs; blockers: none unless obvious.
+               Evaluate achievement criteria deterministically as the skill describes; no evidence → no unlock.
+               Then advance `current_day` to the next day (and `current_project` if the next day belongs to another project
+               per `curriculum/00-overview.md`).
+            2. If `${{ needs.context.outputs.auto_update_buddy }}` is `true`: read and follow `.claude/skills/update-buddy/SKILL.md`.
+               Reflection answers = `.learning-out/reflection.md` (if empty, note "no written reflection — run /debrief locally").
+               Summary = what the learner attempted/decided/got stuck on, derived from the session diff and
+               `.learning-out/test-results.json`. Respect every hard rule (caps, redaction, no code/class/library names).
+               Then write the current HEAD sha into `.claude/buddy/.last-debrief-sha` (marks the start of the next session).
+
+            Only modify files under `progress/` and `.claude/buddy/`. Do not commit or push — the workflow does that.
+            Finally write the award-xp banner (XP earned, level, achievements unlocked, streak) to `.learning-out/award.md`.
+
+      - name: Commit progress + buddy memory
+        if: ${{ steps.verify.outputs.all_passed == 'true' }}
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          git config user.name "learning-loop[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- progress .claude/buddy
+          if ! git diff --cached --quiet; then
+            git commit -m "progress: day ${{ needs.context.outputs.day_padded }} accepted ${BOT_TAG}"
+            git pull --rebase origin "$BRANCH"
+            git push origin "HEAD:$BRANCH"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verify-and-award
+          path: |
+            ${{ env.OUT_DIR }}/verification.json
+            ${{ env.OUT_DIR }}/profile-before.json
+            ${{ env.OUT_DIR }}/award.md
+          if-no-files-found: ignore
+          include-hidden-files: true
+
+  # ------------------------------------------------------------------ report: one comment with dashboard + review
+  report:
+    needs: [context, session-ci, learning-review, verify-and-award]
+    if: ${{ always() && github.event_name == 'push' && needs.session-ci.result != 'skipped' && needs.session-ci.result != 'cancelled' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ env.OUT_DIR }}
+          merge-multiple: true
+
+      - name: Render dashboard
+        run: python3 .github/scripts/learning_loop.py dashboard --out "$OUT_DIR/dashboard.md" --title "🎮 Learning Loop — Day ${{ needs.context.outputs.day }}"
+
+      - name: Post / update the learning comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ needs.session-ci.outputs.head || github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          {
+            echo "<!-- learning-loop -->"
+            [ -f "$OUT_DIR/award.md" ] && { cat "$OUT_DIR/award.md"; echo; }
+            cat "$OUT_DIR/dashboard.md"
+            echo
+            if [ -f "$OUT_DIR/review.md" ]; then cat "$OUT_DIR/review.md"; else echo "_Learning review unavailable for this run._"; fi
+            echo
+            echo "<sub>🧠 The Learning Buddy runs locally: \`/buddy\` when stuck, \`/debrief\` to end the session.</sub>"
+          } > "$OUT_DIR/comment.md"
+
+          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty' || true)
+          if [ -n "$pr" ]; then
+            existing=$(gh api "repos/$REPO/issues/$pr/comments" --paginate --jq '.[] | select(.body | startswith("<!-- learning-loop -->")) | .id' | tail -n1)
+            if [ -n "$existing" ]; then
+              gh api -X PATCH "repos/$REPO/issues/comments/$existing" -F body=@"$OUT_DIR/comment.md" >/dev/null
+            else
+              gh pr comment "$pr" --body-file "$OUT_DIR/comment.md"
+            fi
+          else
+            gh api -X POST "repos/$REPO/commits/$SHA/comments" -F body=@"$OUT_DIR/comment.md" >/dev/null
+          fi
+          cat "$OUT_DIR/comment.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Session outcome
+        run: |
+          echo "Session CI: ${{ needs.session-ci.result }} · passed=${{ needs.session-ci.outputs.passed }} locked=${{ needs.session-ci.outputs.locked }} real_failures=${{ needs.session-ci.outputs.real_failures }}"
+          echo "Verification: ${{ needs.verify-and-award.outputs.all_passed || 'not run' }}"

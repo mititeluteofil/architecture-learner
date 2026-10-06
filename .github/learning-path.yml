@@ -1,0 +1,29 @@
+# Learning path configuration — read by .github/workflows/learning-loop.yml
+# Flat `key: value` pairs only (parsed without a YAML library). Edit freely; it is YOUR path.
+
+# Daily budget in minutes. Drives the time-box hints in reviews and the planned_minutes passed to award-xp.
+planned_minutes: 90
+
+# sprint (≈2.5h/day, 30 days) | steady (≈1–1.5h/day, ~55 days) | weekend (≈4h/week)
+pace: steady
+
+# core | cloud | distributed | full — which projects the workflow suggests next.
+#   core        = p1 → p2 → p3 → p4 → p5
+#   cloud       = p4 → p7 → p8 → p9
+#   distributed = p3 → p5 → p6
+track: full
+
+# thorough      = full compiling skeletons, you fill the invariants
+# minimal       = module + pom + acceptance tests only, you design ports/packages
+# contract-only = only ArchUnit rules + contract/acceptance tests as the spec
+scaffold_level: thorough
+
+# How harsh the learning review is: gentle | honest | menace
+#   menace = roast what is genuinely wrong, with XP-style "penalties" in the comment (never in profile.json)
+review_tone: menace
+
+# Run the day's ## Verification block automatically when session tests are green (true|false).
+auto_verify: true
+
+# Update buddy memory (update-buddy skill) after a successful verification (true|false).
+auto_update_buddy: true
