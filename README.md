@@ -73,4 +73,6 @@ XP per action, six levels (Apprentice → Architect), fifteen named achievements
 | Run workflow → `dashboard` | Renders level, XP bar, streak, achievement grid in the run summary. |
 | `git push` of your work | Test-scaffolder (only for touched projects, only missing tests) → CI runs **only the tests added/changed since the last debrief** → learning-focused review (alternatives, ROI, and a roast when it's deserved) → `verify-day` → `award-xp` → `update-buddy` → one dashboard + review comment on your PR (or commit). |
 
+Every push report also has a **🧭 Why this run did what it did** section, built from the `run-manifest.json` artifact. It shows the session window and why it was chosen, the test-scaffolder's scope and added skeletons, selected vs. reported tests, and a ran/skipped/failed decision trail with a reason for every gate. It also gives a **Next** loop-back hint telling you where to re-enter the loop after a failure. Verification lists every check; checks after the first failure show as ⏸️ not run.
+
 Tests that still `fail("LEARNER: …")` are shown as 🔒 locked quests, not failures. Add a `## Reflection` section to your PR description to feed `update-buddy`. The Learning Buddy (`/buddy`, `/debrief`) stays local. Requires the `JUNIE_API_KEY` repository secret.

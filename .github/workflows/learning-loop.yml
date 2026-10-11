@@ -209,6 +209,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       sha: ${{ steps.commit.outputs.sha }}
+      added: ${{ steps.commit.outputs.added }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -247,6 +248,7 @@ jobs:
           git config user.name "learning-loop[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- ':(glob)projects/**/src/test/**'
+          echo "added=$(git diff --cached --name-only --diff-filter=A | paste -sd, -)" >> "$GITHUB_OUTPUT"
           if ! git diff --cached --quiet; then
             git commit -m "test: scaffold session test skeletons ${BOT_TAG}"
             git pull --rebase origin "$BRANCH"
@@ -269,6 +271,7 @@ jobs:
       real_failures: ${{ steps.run.outputs.real_failures }}
       locked: ${{ steps.run.outputs.locked }}
       passed: ${{ steps.run.outputs.passed }}
+      green: ${{ steps.run.outputs.green }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -478,8 +481,9 @@ jobs:
 
   # ------------------------------------------------------------------ report: one comment with dashboard + review
   report:
-    needs: [context, session-ci, learning-review, verify-and-award]
-    if: ${{ always() && github.event_name == 'push' && needs.session-ci.result != 'skipped' && needs.session-ci.result != 'cancelled' }}
+    needs: [context, test-scaffold, session-ci, learning-review, verify-and-award]
+    # Runs even when an upstream job failed or was skipped, so the decision trail explains it instead of going silent.
+    if: ${{ always() && github.event_name == 'push' && needs.context.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -487,9 +491,30 @@ jobs:
           ref: ${{ github.ref_name }}
 
       - uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           path: ${{ env.OUT_DIR }}
           merge-multiple: true
+
+      - name: Build run manifest (what this run holds and why each gate ran / skipped)
+        env:
+          LL_EVENT: ${{ github.event_name }}
+          LL_PUSH_BASE: ${{ needs.context.outputs.push_base }}
+          LL_CHANGED_MAIN: ${{ needs.context.outputs.changed_main_projects }}
+          LL_TEST_SCAFFOLD_RESULT: ${{ needs.test-scaffold.result }}
+          LL_SCAFFOLDED: ${{ needs.test-scaffold.outputs.added }}
+          LL_SESSION_CI_RESULT: ${{ needs.session-ci.result }}
+          LL_GREEN: ${{ needs.session-ci.outputs.green }}
+          LL_REVIEW_RESULT: ${{ needs.learning-review.result }}
+          LL_VERIFY_JOB_RESULT: ${{ needs.verify-and-award.result }}
+          LL_DAY: ${{ needs.context.outputs.day }}
+          LL_PROJECT: ${{ needs.context.outputs.project }}
+        run: python3 .github/scripts/learning_loop.py manifest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: run-manifest
+          path: ${{ env.OUT_DIR }}/run-manifest.json
 
       - name: Render dashboard
         run: python3 .github/scripts/learning_loop.py dashboard --out "$OUT_DIR/dashboard.md" --title "🎮 Learning Loop — Day ${{ needs.context.outputs.day }}"
@@ -526,5 +551,10 @@ jobs:
 
       - name: Session outcome
         run: |
-          echo "Session CI: ${{ needs.session-ci.result }} · passed=${{ needs.session-ci.outputs.passed }} locked=${{ needs.session-ci.outputs.locked }} real_failures=${{ needs.session-ci.outputs.real_failures }}"
-          echo "Verification: ${{ needs.verify-and-award.outputs.all_passed || 'not run' }}"
+          python3 - <<'EOF'
+          import json
+          m = json.load(open(".learning-out/run-manifest.json", encoding="utf-8"))
+          for g in m["gates"]:
+              print(f"{g['gate']:<16} {g['status']:<8} {g['reason']}")
+          print("next:", m["loop_back"])
+          EOF
