@@ -25,6 +25,9 @@ public final class Loan {
         this.status = Objects.requireNonNull(status, "status");
         this.startDate = Objects.requireNonNull(startDate, "startDate");
         // TODO LEARNER: define construction invariants for principal, outstanding balance, allowed initial status, and date semantics.
+
+
+
     }
 
     public LoanId getId() {
