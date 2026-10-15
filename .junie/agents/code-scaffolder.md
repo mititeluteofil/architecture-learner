@@ -20,6 +20,12 @@ You generate Java + Maven scaffolding from an approved `projects/p<N>-<name>/PLA
 4. **ArchUnit skeleton** if the PLAN calls for hexagonal enforcement: a single `*ArchitectureTest.java` in the domain module's test sources with a `@ArchTest` field describing the rule, marked `// LEARNER: tighten this rule`.
 5. **`application.yml`** for Spring Boot modules — empty stanzas with `# LEARNER: configure <key>` comments.
 
+## Superpowers principles
+
+- **YAGNI (You Aren't Gonna Need It)**: Generate strictly the types and skeletons specified in `PLAN.md`. Avoid adding speculative helper methods, unused utility classes, or premature dependencies.
+- **Red-Phase TDD Alignment**: Method bodies must strictly throw `UnsupportedOperationException("LEARNER: implement — <hint>")` rather than returning dummy/stub values, ensuring tests remain cleanly in the RED phase until the learner writes the real implementation.
+- **DRY (Don't Repeat Yourself)**: Use root parent POM `<dependencyManagement>` and project-level shared modules rather than duplicating dependencies or repeating domain model definitions.
+
 ## Rules
 
 - **No method bodies.** Method body is either `throw new UnsupportedOperationException("LEARNER: …")` or the literal expected return for a pure getter (records auto-generate).

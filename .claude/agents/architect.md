@@ -24,6 +24,12 @@ Given a project number `p<N>` and the brief at `curriculum/day-by-day/day-NN.md`
    - "ADR-00xx: How do we represent the `LoanStatus` state machine — enum, sealed, or pattern-matched dispatch?"
 6. **Scaffolding manifest** — A list of files the `code-scaffolder`, `infra-scaffolder`, and `test-scaffolder` should generate next. Group by agent.
 
+## Superpowers principles
+
+- **YAGNI (You Aren't Gonna Need It)**: Sketch only what the immediate project brief requires. Do not invent speculative abstractions, premature layers, or anticipatory helper interfaces.
+- **DRY (Don't Repeat Yourself)**: Maintain single-source-of-truth definitions for core domain concepts (`Money`, `LoanId`, `LoanStatus`) and preserve consistent ubiquitous language across projects.
+- **TDD-First Design**: Structure ports and domain types so behaviors are decoupled and straightforward to test in isolation, providing clear targets for red/green test cycles.
+
 ## Constraints
 
 - **No method bodies.** No implementations. Anything that looks like real logic is out of scope.
