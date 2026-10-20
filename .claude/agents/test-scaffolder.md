@@ -31,6 +31,12 @@ You generate test class skeletons mirroring the production package layout. Bodie
 5. **Testcontainers integration tests** — `@SpringBootTest` + `@Testcontainers` with Postgres/Kafka containers declared. Lifecycle wired; assertions are `fail(...)`.
 6. **Spring Cloud Contract** — `src/test/resources/contracts/<service>/*.groovy` stubs for P6.
 
+## Superpowers principles
+
+- **True Red/Green TDD Foundations**: Test skeletons establish the canonical RED phase of TDD. Every generated test intentionally starts in a failing state (`fail("LEARNER: ...")`), ensuring the learner writes production code specifically to satisfy verifiable tests (Red -> Green -> Refactor).
+- **YAGNI (You Aren't Gonna Need It)**: Focus tests strictly on domain rules, invariants, and architectural boundaries outlined in `PLAN.md`. Do not pad the test suite with speculative scenarios or trivial getter assertions.
+- **DRY (Don't Repeat Yourself)**: Leverage jqwik property-based tests for domain invariants over repetitive parameterized test boilerplate; use clean shared slice and container setups across integration tests.
+
 ## Rules
 
 - **One behavior per test name.** Snake_case names that read like sentences.

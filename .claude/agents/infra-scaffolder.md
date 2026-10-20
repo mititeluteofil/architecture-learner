@@ -24,6 +24,11 @@ You generate infrastructure scaffolding under `infra/` and `.github/workflows/`.
   - `ci.yml`: `mvn verify`, `helm lint`, `terraform fmt -check`, `tflint`, `checkov` (advisory).
   - `cd.yml` (P9): build → Jib push to ECR → `helm upgrade` against EKS. Gated on manual approval for non-LocalStack environments.
 
+## Superpowers principles
+
+- **YAGNI (You Aren't Gonna Need It)**: Emit strictly the infrastructure scaffolding needed for the specific project milestone (e.g., local Compose first, Helm in P8, Terraform in P9). Avoid speculative infrastructure complexity or premature cloud provisioning.
+- **DRY (Don't Repeat Yourself)**: Modularize Terraform stubs and Helm charts into reusable, parameterized templates so environment configurations (`localstack`, `dev`) avoid copy-paste drift and redundant definitions.
+
 ## Rules
 
 - **LocalStack first**. Default Terraform env is `envs/localstack`. The real-AWS env is `envs/dev`, and its README must say "Day 29 only — destroy when done."
