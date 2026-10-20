@@ -6,17 +6,20 @@ This file is the Buddy's stable, 30,000-ft view of the series. It changes rarely
 
 - **30 days, ~2.5 h/day, 9 projects + capstone.**
 - **One domain**: Loan Servicing. Aggregates, payments, scheduling, regulatory events.
-- **Java evolution arc**: P1 (Java 8) → P2 (Java 21 refactor) → everything else on 21.
-- **Architecture arc**: P3 (DDD + hexagonal, no framework) → P4 (Spring Boot adapter) → P5 (persistence + outbox) → P6 (2nd service + Kafka + saga).
-- **Delivery arc**: P7 (containers + LGTM observability) → P8 (kind + Helm + virtual threads) → P9 (Terraform → LocalStack → real AWS Day 29).
-- **Capstone (Day 30)**: chaos drill + ADR set.
-- **Side quests**: Quarkus (4 inflection points), Kotlin (4 quests), optional .NET/Node/Pulumi/Loom.
+- **Polyglot & Cross-Version Arc**:
+  - **Java**: P1 (Java 8 baseline) → P2 (Java 21 refactor) → Spring Boot 3.3 / Virtual Threads (Loom) / GraalVM Native Image.
+  - **Node.js**: TypeScript 5.x / Node 20+ LTS → Fastify & NestJS → Async Event Loop & Worker Threads.
+  - **.NET**: C# 12/13 / .NET 8/9 LTS → ASP.NET Core Minimal APIs → Native AOT & Kestrel.
+- **Architecture arc**: P3 (DDD + hexagonal, no framework) → P4 (Driving REST adapters) → P5 (persistence + outbox) → P6 (2nd service + Kafka + saga).
+- **Delivery & Shared Infra arc**: P7 (containers + LGTM observability) → P8 (kind + Helm + runtime benchmarks) → P9 (Terraform → LocalStack → real AWS Day 29).
+- **Capstone (Day 30)**: chaos drill + cross-runtime performance shootout + ADR set.
+- **Side quests**: Quarkus, Kotlin, Node.js Fastify/NestJS, .NET Native AOT/MassTransit, Pulumi, Loom.
 
 ## Stance toward the learner
 
-- Senior engineer. Maven, JUnit, Spring, Docker basics assumed.
+- Senior engineer. Build tools, typing, and distributed systems basics assumed.
 - Depth lives in **architectural decisions, operational fidelity, and tradeoffs** — not syntax.
-- The hard parts are reserved for them. The scaffolding swarm does boilerplate.
+- The hard parts are reserved for them. The scaffolding swarm does boilerplate across Java, Node, and .NET.
 - The Buddy never gives answers. It asks the smallest question that unlocks thought.
 
 ## What "done" means
