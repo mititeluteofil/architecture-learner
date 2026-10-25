@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "xp_events": {
+    "session_ignition": 25,
+    "micro_step": 20,
+    "daily_acceptance": 100,
+    "side_quest": 150,
+    "adr": 35,
+    "adr_landing": 40,
+    "property_bug": 50,
+    "mutation_score": 60,
+    "debrief": 25,
+    "public_artifact": 200
+  },
+  "micro_step_max": 5,
+  "levels": [
+    { "id": "L1", "name": "Apprentice", "min": 0, "max": 600 },
+    { "id": "L2", "name": "Journeyman", "min": 601, "max": 1600 },
+    { "id": "L3", "name": "Engineer", "min": 1601, "max": 3200 },
+    { "id": "L4", "name": "Senior", "min": 3201, "max": 5600 },
+    { "id": "L5", "name": "Staff", "min": 5601, "max": 9000 },
+    { "id": "L6", "name": "Architect", "min": 9001, "max": null }
+  ],
+  "shields": { "every": 3, "max": 3 }
+}
