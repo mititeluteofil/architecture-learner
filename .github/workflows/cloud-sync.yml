@@ -43,3 +43,6 @@ jobs:
 
       # --if-present keeps this green until the test script exists.
       - run: npm test --if-present
+
+      # /sync payload builder (zero-dep, node:test).
+      - run: node --test "scripts/*.test.mjs"

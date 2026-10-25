@@ -53,7 +53,7 @@ Written to be split across parallel agents. Each task names the files it **owns*
 - Trigger on `push` and `pull_request` with `paths: tools/cloud-sync/**, progress/rules.json`. Node 24, `working-directory: tools/cloud-sync`, `npm ci`, `npm run typecheck`, `npm test --if-present`. No secrets, no deploy step.
 - **Accept:** `npx --yes @action-validator/cli .github/workflows/cloud-sync.yml` (or equivalent) passes; workflow does not reference any secret.
 
-## Wave 2 — after Wave 1 merges
+## Wave 2 — after Wave 1 merges · ✅ done (T5 `ada8903`, T6 `1605e7b`, T7 artifact v11). `/sync` not yet run end-to-end: needs a deployed worker (H2)
 
 ### T5 · Worker reads `progress/rules.json` · needs T1, T2
 **Owns:** `tools/cloud-sync/src/rules.ts`, `tools/cloud-sync/tsconfig.json`, tests for it.
