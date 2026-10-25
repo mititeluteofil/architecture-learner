@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeLevel, computeStreak } from "../src/rules";
+import { LEVELS, computeLevel, computeStreak } from "../src/rules";
 
 describe("computeLevel", () => {
   it.each([
@@ -39,4 +39,47 @@ describe("computeStreak", () => {
 
   // Dedupe of same-day sessions lives in rebuildProfile (Set over date.slice(0,10)),
   // so it is covered in sync.test.ts; computeStreak expects unique sorted dates.
+});
+
+// Drift guard: the worker must follow progress/rules.json (the award-xp skill's source of truth).
+import rules from "../../../progress/rules.json";
+
+describe("rules.json drift", () => {
+  it("worker level table equals rules.json", () => {
+    expect(LEVELS).toEqual(rules.levels);
+  });
+
+  it("computeLevel matches every rules.json boundary", () => {
+    rules.levels.forEach((l, i) => {
+      const at = computeLevel(l.min);
+      expect(at.id).toBe(l.id);
+      expect(at.name).toBe(l.name);
+      expect(at.xp_in_level).toBe(0);
+      if (l.max === null) {
+        expect(i).toBe(rules.levels.length - 1);
+        expect(at.xp_to_next).toBe(0);
+        expect(computeLevel(l.min + 100_000).id).toBe(l.id);
+      } else {
+        const top = computeLevel(l.max);
+        expect(top.id).toBe(l.id);
+        expect(top.xp_to_next).toBe(1);
+        expect(computeLevel(l.max + 1).id).toBe(rules.levels[i + 1].id);
+      }
+    });
+  });
+
+  it("shield fold follows shields.every and shields.max", () => {
+    const day = (n: number) => new Date(Date.UTC(2026, 0, 1 + n)).toISOString().slice(0, 10);
+    const { every, max } = rules.shields;
+    // Consecutive run long enough to hit the cap: shields == min(max, floor(n / every)).
+    const n = every * (max + 2);
+    const run = Array.from({ length: n }, (_, i) => day(i));
+    expect(computeStreak(run)).toEqual({
+      streak_days: n,
+      streak_shields: Math.min(max, Math.floor(n / every)),
+    });
+    // First shield appears exactly at day `every`.
+    expect(computeStreak(run.slice(0, every - 1)).streak_shields).toBe(0);
+    expect(computeStreak(run.slice(0, every)).streak_shields).toBe(1);
+  });
 });
