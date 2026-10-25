@@ -32,35 +32,30 @@ planned_minutes: 150
 
 ## XP table
 
-| event | XP | Emitted by | Notes |
-|---|---|---|---|
-| session_ignition | 25 | `/start` | Once per day — first `/start` of the day. Re-runs are no-ops. |
-| micro_step | 20 | `/debrief` | One per `## Main Quest` item marked `done` (max 5 = 100 XP). |
-| daily_acceptance | 100 | `/verify` | Requires `verification.all_passed === true`. Stacks with micro_step. |
-| side_quest | 150 | `/debrief` | Per side quest with `status: done`. |
-| adr | 35 | `/debrief` | Per new `curriculum/adr/NNNN-*.md` with explicit trade-offs. |
-| adr_landing | 40 | `/debrief` | Per ADR whose decision is exercised by a passing test (learner names the test). |
-| property_bug | 50 | `/debrief` | jqwik surfaced a real invariant counterexample (learner supplies the seed). |
-| mutation_score | 60 | `/verify` | PIT ≥80% on a module. Once per module. |
-| debrief | 25 | `/debrief` | Always. |
-| public_artifact | 200 | `/debrief` | Blog/gist URL supplied. |
+XP values live in **`progress/rules.json`** (`xp_events`) — read it on every call; it is the single source of truth. Never hard-code numbers here.
+
+| event | Emitted by | Notes |
+|---|---|---|
+| session_ignition | `/start` | Once per day — first `/start` of the day. Re-runs are no-ops. |
+| micro_step | `/debrief` | One per `## Main Quest` item marked `done` (max `micro_step_max`). |
+| daily_acceptance | `/verify` | Requires `verification.all_passed === true`. Stacks with micro_step. |
+| side_quest | `/debrief` | Per side quest with `status: done`. |
+| adr | `/debrief` | Per new `curriculum/adr/NNNN-*.md` with explicit trade-offs. |
+| adr_landing | `/debrief` | Per ADR whose decision is exercised by a passing test (learner names the test). |
+| property_bug | `/debrief` | jqwik surfaced a real invariant counterexample (learner supplies the seed). |
+| mutation_score | `/verify` | PIT ≥80% on a module. Once per module. |
+| debrief | `/debrief` | Always. |
+| public_artifact | `/debrief` | Blog/gist URL supplied. |
 
 Multiple events in one brief stack. Every event must be emitted by the command named above — never inferred.
 
-**XP is never recomputed retroactively.** A session's `xp_earned` is fixed when it is written. Achievement XP is added to the `xp_earned` of the session in which it unlocks, so `xp_total = Σ sessions[].xp_earned` — nothing else. Changing this table only affects future sessions (session-01 keeps its 175 XP earned under the old `adr = 75`).
+**XP is never recomputed retroactively.** A session's `xp_earned` is fixed when it is written. Achievement XP is added to the `xp_earned` of the session in which it unlocks, so `xp_total = Σ sessions[].xp_earned` — nothing else. Changing `rules.json` only affects future sessions (session-01 keeps its 175 XP earned under the old `adr = 75`).
 
 ## Levels
 
 Thresholds were doubled when micro_step/session_ignition raised a typical day from ~125 to ~250 XP, so L6 stays a day-28–30 goal.
 
-| id | name | XP range |
-|---|---|---|
-| L1 | Apprentice | 0–600 |
-| L2 | Journeyman | 601–1600 |
-| L3 | Engineer | 1601–3200 |
-| L4 | Senior | 3201–5600 |
-| L5 | Staff | 5601–9000 |
-| L6 | Architect | 9001+ |
+Level bands (`levels[]`: `id`, `name`, `min`, `max`; L6 `max: null`) are read from `progress/rules.json`.
 
 ## Achievement criteria (evaluated each call)
 
@@ -68,10 +63,10 @@ See `progress/achievements.json` `definitions[]`. Each definition has a `criteri
 
 ## Files you write
 
-1. **`progress/sessions/session-NN.json`** — the full session record (schema in plan).
+1. **`progress/sessions/session-NN.json`** — the full session record (schema in `progress/DASHBOARD-SPEC.md`). Every new or merged session file carries `"schema_version": 1` and `xp_breakdown: [{event, xp}]` (from session-02 on; never back-fill session-01).
 2. **`progress/profile.json`** — recompute `xp_total`, `level`, `xp_in_level`, `xp_to_next`, `streak_days`, `streak_shields`, `last_session_at`, `current_day`, `current_project`, `achievements_unlocked`, `achievements_total` (= `definitions.length`, never hard-coded).
 3. **`progress/achievements.json`** — append newly-unlocked items to `unlocked[]`.
-4. **`progress/feed.json`** — regenerate fully from all `sessions/*.json` plus `profile.json` + `achievements.json`.
+4. **`progress/feed.json`** — regenerate fully from all `sessions/*.json` plus `profile.json` + `achievements.json`; includes `streak_shields`.
 
 ## Streak & Shield rule
 
@@ -86,7 +81,7 @@ for d in dates:
     if missed == 0:           streak += 1
     elif missed <= shields:   shields -= missed; streak += 1   # one shield per missed day
     else:                     streak = 1                       # reset, no penalty, no shame copy
-  if streak % 3 == 0:         shields = min(3, shields + 1)
+  if streak % rules.shields.every == 0:   shields = min(rules.shields.max, shields + 1)
   prev = d
 ```
 
