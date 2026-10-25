@@ -1,5 +1,5 @@
 name = "architecture-learner-sync"
-main = "worker.ts"
+main = "src/index.ts"
 compatibility_date = "2026-05-01"
 
 # Cloudflare Free Tier limits apply automatically
