@@ -33,7 +33,7 @@ Gather, from the learner's answers and the curriculum:
 ### Phase 3 — Commit the record
 
 1. Invoke the `update-buddy` skill with a ≤200-word summary built from the reflection and decisions. It rewrites `learner-profile.md` and prepends to `session-log.md`.
-2. Invoke the `award-xp` skill with the session data. Events to include: `debrief` always; `daily_acceptance` only if `verification.all_passed === true`; `side_quest` per completed side quest; `adr` per new ADR (check `curriculum/adr/` for files newer than the last session).
+2. Invoke the `award-xp` skill with the session data. Events to include: `debrief` always; `micro_step` once per `## Main Quest` goal marked `done` (max 5); `daily_acceptance` only if `verification.all_passed === true`; `side_quest` per completed side quest; `adr` per new ADR (check `curriculum/adr/` for files newer than the last session); `adr_landing` per ADR the learner points to a passing test for (ask — never infer); `property_bug` / `public_artifact` only if the learner reports one with evidence.
 3. **Republish the dashboard.** Only after `award-xp` has finished writing. Canvas: `https://claude.ai/artifact/EfeuGDbr9yb8RTrmJzs6Tf` (Design artifact, four artboards under `project/`).
    - **No Artifact tool in this session** (e.g. plain CLI, Junie): skip this step, print `Dashboard not republished — no Artifact tool in this session.` and continue. Never abort the debrief over it.
    - Read each artboard from the canvas first (`read` with `path`), so hand edits made in the page are kept: `project/Main.dc.html`, `project/Session.dc.html`, `project/Achievements.dc.html`, `project/Journal.dc.html`.

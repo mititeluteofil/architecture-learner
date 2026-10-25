@@ -60,7 +60,7 @@ Then open `curriculum/day-by-day/day-01.md` and run `/kickoff p1` when ready.
 
 ## Gamification
 
-XP per action, six levels (Apprentice → Architect), fifteen named achievements. State lives in `progress/profile.json`. The Learning Buddy keeps a rolling 7-session summary in `.claude/buddy/session-log.md` and a learner profile that evolves with you.
+XP per action, six levels (Apprentice → Architect), eighteen named achievements. State lives in `progress/profile.json`. The Learning Buddy keeps a rolling 7-session summary in `.claude/buddy/session-log.md` and a learner profile that evolves with you.
 
 ## Learning Loop (GitHub Actions)
 

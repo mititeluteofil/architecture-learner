@@ -1,0 +1,24 @@
+name = "architecture-learner-sync"
+main = "worker.ts"
+compatibility_date = "2026-05-01"
+
+# Cloudflare Free Tier limits apply automatically
+# 100,000 requests/day, 10ms CPU time/invocation
+
+[vars]
+# The worker refuses every protected request (503) until these are real values.
+# AZURE_TENANT_ID: your tenant GUID (single-tenant, recommended) or "organizations".
+# With "organizations", ALLOWED_TENANT_IDS must list the tenants allowed to sync.
+AZURE_TENANT_ID = "organizations"
+AZURE_CLIENT_ID = "00000000-0000-0000-0000-000000000000"
+ALLOWED_TENANT_IDS = ""
+REQUIRED_SCOPE = "Progress.Sync"
+# Exact origin of the dashboard. Never "*".
+ALLOWED_ORIGIN = "http://localhost:5173"
+
+# D1 Serverless SQLite Binding (5GB Free Tier)
+# Create with: npx wrangler d1 create architecture-learner-db
+[[d1_databases]]
+binding = "DB"
+database_name = "architecture-learner-db"
+database_id = "00000000-0000-0000-0000-000000000000"

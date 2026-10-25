@@ -18,4 +18,4 @@ Read `progress/profile.json` to determine `current_day`. Then assemble and print
 
 Keep the whole brief under one screen. No commentary, no encouragement, no emojis. The learner wants signal, not narration.
 
-Do not modify any files. This command is strictly read-only.
+Do not modify any files yourself. The one write is delegated: after printing the brief, invoke the `award-xp` skill with `event: session_ignition`, `day`, and `project`. It is a no-op if today's session file already records `session_ignition`. Append its banner line under the status line.

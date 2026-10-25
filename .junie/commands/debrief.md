@@ -32,7 +32,7 @@ Gather, from the learner's answers and the curriculum:
 ### Phase 3 — Commit the record
 
 1. Invoke the `update-buddy` skill with a ≤200-word summary built from the reflection and decisions. It rewrites `learner-profile.md` and prepends to `session-log.md`.
-2. Invoke the `award-xp` skill with the session data. Events to include: `debrief` always; `daily_acceptance` only if `verification.all_passed === true`; `side_quest` per completed side quest; `adr` per new ADR (check `curriculum/adr/` for files newer than the last session).
+2. Invoke the `award-xp` skill with the session data. Events to include: `debrief` always; `micro_step` once per `## Main Quest` goal marked `done` (max 5); `daily_acceptance` only if `verification.all_passed === true`; `side_quest` per completed side quest; `adr` per new ADR (check `curriculum/adr/` for files newer than the last session); `adr_landing` per ADR the learner points to a passing test for (ask — never infer); `property_bug` / `public_artifact` only if the learner reports one with evidence.
 3. Record the current `HEAD` sha to `.claude/buddy/.last-debrief-sha` so the next `/debrief` knows where to diff from.
 4. Print the retro banner: today's XP, level (and change if any), new achievements, streak. Tell the learner: "Open the Angular dashboard (or read `progress/feed.json`) for the visual retro."
 
