@@ -12,7 +12,7 @@ You are the single writer to the gamification state files. Direct edits by human
 The caller provides a JSON-ish brief:
 
 ```yaml
-event: session_ignition | micro_step | daily_acceptance | side_quest | adr | adr_landing | property_bug | mutation_score | debrief | public_artifact
+event: session_ignition | micro_step | daily_acceptance | side_quest | adr | adr_landing | property_bug | mutation_score | debrief | public_artifact | hydrate
 day: 1
 project: p1-loan-core-java8
 verification:
@@ -93,6 +93,20 @@ for d in dates:
 - **Idempotent**: re-running with the same inputs must produce the same final state.
 - **No silent unlocks**: every achievement unlock includes `evidence` (file path, command output snippet, or session reference).
 - **No XP for verification failures**: if `verification.all_passed === false`, `daily_acceptance` is **not** awarded — but other concurrent events (side_quest, adr) still are if they qualify.
+
+## Hydrate (`event: hydrate`)
+
+Emitted only by `/sync pull`. It restores session history from Cloud Sync and **awards nothing**: `hydrate` is deliberately **not** in the XP table and **not** in `progress/rules.json` `xp_events` — drift checks between the skill's XP events and `rules.json` must ignore it.
+
+Brief: `event: hydrate`, `sessions: [<full session records>]`, `unlocked_achievements: [{id, unlocked_at, session_id, evidence}]`.
+
+1. For each record, if `progress/sessions/session-NN.json` (NN = `session`, zero-padded) does **not** exist, write the record verbatim — `xp_earned`, `xp_breakdown`, `events` and every other field as received. If it exists, **skip it; never overwrite**.
+2. Do not append events, do not evaluate achievement criteria, do not award XP. `xp_earned` is kept as-is (so `xp_total = Σ sessions[].xp_earned` still holds).
+3. Union `unlocked_achievements` into `achievements.json.unlocked[]`, de-duplicated by `id` (local entry wins).
+4. Recompute `profile.json` and regenerate `feed.json` as usual (streak/shields fold over all session dates).
+5. Banner: sessions restored (numbers), skipped (already local), unlocks added, resulting XP total/level/streak. Idempotent — a second identical call changes nothing.
+
+Server records lack the private fields (`reflection`, `buddy_questions_asked`, `notes`); leave them absent.
 
 ## Process
 
