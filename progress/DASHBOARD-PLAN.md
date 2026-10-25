@@ -21,7 +21,7 @@ Written to be split across parallel agents. Each task names the files it **owns*
 5. Every `.claude/…` file you change has a `.junie/…` twin; change both identically.
 6. Done = the task's acceptance commands pass and are pasted in the hand-off.
 
-## Wave 1 — parallel
+## Wave 1 — parallel · ✅ done (T1 `79995fc`, T2 `0baed31`, T3 artifact v10, T4 `f58a7fe`)
 
 ### T1 · Worker modules + test suite
 **Owns:** `tools/cloud-sync/**` (except `CLOUDFLARE-SYNC-SPEC.md`).
@@ -76,7 +76,7 @@ Written to be split across parallel agents. Each task names the files it **owns*
 
 | # | Question | Blocks |
 |---|---|---|
-| H1 | Is a cross-learner leaderboard actually wanted? If not, stop after Wave 1. | T6, any deploy |
+| H1 | ~~Is a cross-learner leaderboard actually wanted?~~ **Yes — confirmed 2026-10-25.** | — |
 | H2 | IT: admin consent for an Entra app registration + GDPR OK for names/emails in a personal Cloudflare account. | deploy |
 | H3 | Can a claude.ai artifact `fetch` an external origin with a bearer token? If not, sync stays CLI-only (T6) and the dashboard never calls the API. | any in-page sync UI |
 
