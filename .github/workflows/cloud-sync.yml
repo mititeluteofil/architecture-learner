@@ -1,0 +1,45 @@
+name: Cloud Sync
+
+on:
+  push:
+    paths:
+      - 'tools/cloud-sync/**'
+      - 'progress/rules.json'
+      - '.github/workflows/cloud-sync.yml'
+  pull_request:
+    paths:
+      - 'tools/cloud-sync/**'
+      - 'progress/rules.json'
+      - '.github/workflows/cloud-sync.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/cloud-sync
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tools/cloud-sync/package-lock.json
+
+      # npm 11 blocks dependency install scripts by default (e.g. workerd's postinstall).
+      # Typecheck does not need them, so no approval step is added here.
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # --if-present keeps this green until the test script exists.
+      - run: npm test --if-present
