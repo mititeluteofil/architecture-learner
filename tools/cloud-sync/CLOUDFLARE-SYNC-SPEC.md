@@ -16,13 +16,19 @@ Human-only gates. Code can be written and tested without them, but nothing is de
 tools/cloud-sync/             # dashboard tooling, not curriculum infra (that is infra/)
 ├── CLOUDFLARE-SYNC-SPEC.md   # this file
 ├── schema.sql                # D1 schema: two ledgers + one derived cache
-├── worker.ts                 # zero-runtime-dependency Worker (JWT verification + sync API)
+├── src/
+│   ├── index.ts              # fetch handler: routing, CORS, fail-closed config check
+│   ├── auth.ts               # Entra access-token verification
+│   ├── sync.ts               # sync/state/leaderboard handlers + rebuildProfile
+│   ├── rules.ts              # levels + streak/shield fold
+│   └── http.ts               # json() helper
+├── test/                     # vitest + Miniflare D1 (rules, auth, sync)
 ├── wrangler.toml             # bindings; refuses requests until configured
-├── package.json / tsconfig.json
+├── package.json / tsconfig.json / vitest.config.ts
 ```
 
 ```bash
-cd tools/cloud-sync && npm ci && npm run typecheck
+cd tools/cloud-sync && npm ci && npm run typecheck && npm test
 ```
 
 ## Principles
