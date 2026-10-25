@@ -17,7 +17,7 @@ Written to be split across parallel agents. Each task names the files it **owns*
 1. Read `CLAUDE.md` first. This is a learning repo: **never** touch `projects/`, `curriculum/`, or any `// LEARNER:` marker.
 2. **Never write** `progress/profile.json`, `progress/feed.json`, `progress/sessions/*`, the `unlocked[]` of `progress/achievements.json`, `progress/journal.md`, or `.claude/buddy/*`. Those have single writers.
 3. Never run `wrangler deploy`, `wrangler d1 … --remote`, or `wrangler login`. Local only (`--local`, Miniflare, vitest).
-4. Work in a worktree on `cloudflare/<task-id>` branched from `cloudflare`. Don't push; the orchestrator merges into `cloudflare` and pushes.
+4. Work in a worktree on `cloudflare-<task-id>` (not `cloudflare/…` — git can't nest under an existing `cloudflare` branch). Before your first edit, check `git merge-base --is-ancestor cloudflare HEAD`; if it fails, `git reset --hard cloudflare` — worktrees may be cut from `main`. Don't push; the orchestrator merges into `cloudflare` and pushes.
 5. Every `.claude/…` file you change has a `.junie/…` twin; change both identically.
 6. Done = the task's acceptance commands pass and are pasted in the hand-off.
 
