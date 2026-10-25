@@ -1,20 +1,18 @@
-/** Keep in sync with .claude/skills/award-xp/SKILL.md "Levels". */
-export const LEVELS = [
-  { id: "L1", name: "Apprentice", min: 0, max: 600 },
-  { id: "L2", name: "Journeyman", min: 601, max: 1600 },
-  { id: "L3", name: "Engineer", min: 1601, max: 3200 },
-  { id: "L4", name: "Senior", min: 3201, max: 5600 },
-  { id: "L5", name: "Staff", min: 5601, max: 9000 },
-  { id: "L6", name: "Architect", min: 9001, max: Infinity },
-] as const;
+import rules from "../../../progress/rules.json";
+
+// Source of truth: progress/rules.json (shared with the award-xp skill). Do not hard-code values here.
+export const LEVELS = rules.levels;
+const SHIELD_EVERY = rules.shields.every;
+const SHIELD_MAX = rules.shields.max;
 
 export function computeLevel(xpTotal: number) {
-  const lvl = LEVELS.find((l) => xpTotal <= l.max) ?? LEVELS[LEVELS.length - 1];
+  const lvl =
+    LEVELS.find((l) => l.max === null || xpTotal <= l.max) ?? LEVELS[LEVELS.length - 1];
   return {
     id: lvl.id,
     name: lvl.name,
     xp_in_level: xpTotal - lvl.min,
-    xp_to_next: lvl.max === Infinity ? 0 : lvl.max + 1 - xpTotal,
+    xp_to_next: lvl.max === null ? 0 : lvl.max + 1 - xpTotal,
   };
 }
 
@@ -38,7 +36,7 @@ export function computeStreak(sortedDates: string[]) {
         streak = 1;
       }
     }
-    if (streak % 3 === 0) shields = Math.min(3, shields + 1);
+    if (streak % SHIELD_EVERY === 0) shields = Math.min(SHIELD_MAX, shields + 1);
     prev = d;
   }
   return { streak_days: streak, streak_shields: shields };
