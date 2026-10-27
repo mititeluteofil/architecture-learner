@@ -1,0 +1,9 @@
+# abstract verb -> command template; {dir} = project directory
+build: uv run --directory {dir} pytest -q
+discipline.baseline: test "$(grep -rE '^[[:space:]]*match |-> ' --include=*.py {dir}/src | wc -l)" -eq 0
+discipline.modern: uv run --directory {dir} mypy --strict src
+vectors: uv run --directory {dir} pytest -q -k vector
+arch: uv run --directory {dir} lint-imports
+property: uv run --directory {dir} pytest -q -k property
+contract: uv run --directory {dir} pytest -q -k pact
+image: docker build -t loan-service {dir}

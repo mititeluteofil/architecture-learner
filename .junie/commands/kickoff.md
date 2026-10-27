@@ -1,11 +1,11 @@
 ---
 description: Kickoff a project — run the full scaffolding swarm (architect → code → infra → test) with confirmation pauses.
-argument-hint: p<N>
+argument-hint: p<N> [--stack=<id>[,<id>]]
 ---
 
-Argument: the project id (e.g., `p4`). If missing, abort and tell the learner to provide one.
+Arguments: the project id (e.g., `p4`) and optional flags (below). If missing, abort and tell the learner to provide one.
 
-Run the scaffolding swarm for `$ARGUMENTS` in this exact order, pausing for the learner's explicit confirmation between each step. Do **not** chain them silently.
+Run the scaffolding swarm for the project in `$ARGUMENTS` in this exact order, pausing for the learner's explicit confirmation between each step. Do **not** chain them silently.
 
 ### Step 1 — architect
 
@@ -17,7 +17,7 @@ Write the returned plan to `projects/{full-project-folder}/PLAN.md` (resolve the
 
 ### Step 2 — code-scaffolder
 
-On "go": invoke the `code-scaffolder` subagent. It generates the Maven module(s), stub Java files with `// LEARNER:` markers, ArchUnit skeletons, and `application.yml`. It runs `mvn -pl projects/… -am compile` as a smoke check.
+On "go": invoke the `code-scaffolder` subagent. It generates the module(s) and manifests, stub files with `LEARNER:` markers (comment syntax from the pack), an architecture-rule skeleton, and config stubs. It runs the stack pack's `build` verb as a smoke check.
 
 Report: number of files created, count of `LEARNER:` markers, compile result. Ask:
 
@@ -33,12 +33,21 @@ Report: files touched, `# LEARNER:` marker count, any LocalStack vs AWS divergen
 
 ### Step 4 — test-scaffolder
 
-On "go": invoke the `test-scaffolder` subagent. It generates `*Test.java` skeletons with `fail("LEARNER: …")` bodies, jqwik properties, ArchUnit rules, Spring slice tests, Testcontainers fixtures, and (for P6) Spring Cloud Contract stubs.
+On "go": invoke the `test-scaffolder` subagent. It generates test skeletons using the stack pack's failing-test idiom: unit, vector, property, architecture, slice, integration and (where there is a service boundary) contract tests.
 
-Report: test classes created, test methods per class. Confirm `mvn -pl projects/… -am test` compiles (failures from `LEARNER:` markers are expected).
+Report: test classes created, test methods per class. Confirm the stack's tests build (failures from `LEARNER:` markers are expected).
 
 ### Final summary
 
-Print a compact summary table — files added, markers placed, modules registered with the parent POM. Suggest the learner runs `/start` to see today's brief.
+Print a compact summary table — files added, markers placed, units registered with the repo aggregator. Suggest the learner runs `/start` to see today's brief.
 
 Do not award XP. Scaffolding is not progress; filling the markers is.
+
+## Flags
+
+- `--stack=<id>[,<id>]` — any directory under `stacks/`. Default: the `stack:` key in `.github/learning-path.yml`, else `java`. With several ids, run the whole swarm once per stack, in the order given, pausing between stacks as well as between steps. Reject an id with no matching `stacks/<id>/stack.yaml` and list the valid ones.
+- Resolve the project directory from the masterplan manifest (an explicit `dir` override wins), else the stack's `layout.project_dir` with `<N>` and `<slug>` filled in.
+
+Pass the masterplan (default `curriculum/masterplan.yaml`), the project slot and the stack id to every subagent. The agents read the stack pack themselves; do not paraphrase it.
+
+Note: `--assisted` and `--reset-impl` are not implemented yet (planned for Wave 5).

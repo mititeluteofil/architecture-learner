@@ -1,0 +1,9 @@
+# abstract verb -> command template; {dir} = project directory
+build: cd {dir} && bundle exec rspec
+discipline.baseline: test "$(grep -rE 'Data\.define|^[[:space:]]+in ' --include=*.rb {dir}/lib | wc -l)" -eq 0
+discipline.modern: grep -rEq 'Data\.define|^[[:space:]]+in ' --include=*.rb {dir}/lib
+vectors: cd {dir} && bundle exec rspec --tag vector
+arch: cd {dir} && bundle exec packwerk check
+property: cd {dir} && bundle exec rspec --tag property
+contract: cd {dir} && bundle exec rspec --tag pact
+image: docker build -t loan-service {dir}

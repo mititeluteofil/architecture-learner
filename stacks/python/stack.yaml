@@ -1,0 +1,36 @@
+id: python
+name: Python
+language: Python
+steps:
+  baseline:
+    version: "Python 3.8, untyped"
+    spotlight: "Plain classes, no type hints, no match statement"
+  modern:
+    version: "Python 3.12, typed"
+    spotlight: "Frozen dataclasses, full type hints checked by mypy --strict, structural match, Protocol ports"
+frameworks:
+  default: fastapi
+  fastapi: "FastAPI + Uvicorn"
+  django: "Django 5 + DRF (variant)"
+marker:
+  comment: '# LEARNER: <hint>'
+  config_comment: '# LEARNER: <hint>'
+  stub_throw: 'raise NotImplementedError("LEARNER: implement - <hint>")'
+  failing_test: 'pytest.fail("LEARNER: <hint>")'
+layout:
+  manifest: pyproject.toml
+  src: src
+  tests: tests
+  project_dir: "projects/p<N>-<slug>/python/"
+  registration: "Add the project to uv workspace members in the root pyproject.toml if one exists"
+tooling:
+  test: pytest
+  property: Hypothesis
+  arch: import-linter
+  mutation: mutmut
+  contract: pact-python
+  migrations: "yoyo or alembic over the shared SQL"
+  kafka: confluent-kafka
+  otel: opentelemetry-sdk
+  image: "Multi-stage Dockerfile (uv, slim base); plain Dockerfile only for sidecars"
+decimal_type: decimal.Decimal

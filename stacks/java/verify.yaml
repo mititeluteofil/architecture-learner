@@ -1,0 +1,9 @@
+# abstract verb -> command template; {dir} = project directory
+build: ./mvnw -pl {dir} -am verify
+discipline.baseline: test "$(grep -rE 'var |record |sealed ' {dir}/src/main/java | wc -l)" -eq 0
+discipline.modern: grep -rEq 'record |sealed ' {dir}/src/main/java
+vectors: ./mvnw -pl {dir} -am test -Dtest='*Vector*'
+arch: ./mvnw -pl {dir} -am test -Dtest='*ArchitectureTest'
+property: ./mvnw -pl {dir} -am test -Dtest='*Properties,*Property'
+contract: ./mvnw -pl {dir} -am verify -Dtest='*Pact*,*Contract*'
+image: ./mvnw -pl {dir} -am jib:dockerBuild
