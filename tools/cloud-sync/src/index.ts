@@ -61,7 +61,8 @@ export default {
       }
 
       if (url.pathname === "/api/leaderboard" && request.method === "GET") {
-        return await handleGetLeaderboard(claims, env, corsHeaders);
+        const rank = url.searchParams.get("rank") === "lifetime" ? "lifetime" : "run";
+        return await handleGetLeaderboard(claims, env, corsHeaders, rank);
       }
 
       return json({ error: "Not Found" }, 404, corsHeaders);
