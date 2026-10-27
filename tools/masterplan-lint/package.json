@@ -1,0 +1,11 @@
+{
+  "name": "masterplan-lint",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dependency-free linter for spine.yaml / masterplan.yaml manifests, day files and vectors.",
+  "scripts": {
+    "lint": "node lint.mjs",
+    "test": "node --test"
+  }
+}

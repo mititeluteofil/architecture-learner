@@ -1,0 +1,19 @@
+# Loan Servicing masterplan. Content stays in place; this manifest points at the existing paths.
+id: loan-servicing
+title: Loan Servicing
+core_aggregate: Loan
+paths:
+  days: curriculum/day-by-day
+  side_quests: curriculum/side-quests
+  vectors: curriculum/vectors
+projects:
+  p1: { slug: loan-core, dir: projects/p1-loan-core-java8, brief: "Loan, Money, LoanId on the baseline language step" }
+  p2: { slug: loan-core-modern, brief: "Refactor the P1 core to the modern language step" }
+  p3: { slug: loan-domain-hex, brief: "Loan aggregate with ports and adapters, ArchUnit-style rules" }
+  p4: { slug: loan-service-boot, brief: "HTTP driving adapter with an OpenAPI contract" }
+  p5: { slug: loan-persistence-events, brief: "Postgres persistence and transactional outbox" }
+  p6: { slug: payments-service, brief: "Payment allocation as a second bounded context, saga, contracts" }
+  p7: { slug: loan-platform-docker, brief: "Images, compose and LGTM observability" }
+  p8: { slug: loan-platform-k8s, brief: "kind, Helm, autoscaling" }
+  p9: { slug: loan-platform-cloud, brief: "Terraform on LocalStack, real AWS on Day 29, CI" }
+  capstone: { slug: chaos-drill, brief: "Chaos drill and the ADR set" }

@@ -1,0 +1,20 @@
+# New masterplan skeleton. Copy to curriculum/masterplans/<id>/ and replace every TODO.
+id: TODO-id
+title: TODO Title
+core_aggregate: TODO
+# On copy, replace _template with the new id in the three paths below.
+paths:
+  days: curriculum/masterplans/_template/day-by-day
+  side_quests: curriculum/masterplans/_template/side-quests
+  vectors: curriculum/masterplans/_template/vectors
+projects:
+  p1: { slug: TODO, brief: "TODO one line" }
+  p2: { slug: TODO, brief: "TODO one line" }
+  p3: { slug: TODO, brief: "TODO one line" }
+  p4: { slug: TODO, brief: "TODO one line" }
+  p5: { slug: TODO, brief: "TODO one line" }
+  p6: { slug: TODO, brief: "TODO one line" }
+  p7: { slug: TODO, brief: "TODO one line" }
+  p8: { slug: TODO, brief: "TODO one line" }
+  p9: { slug: TODO, brief: "TODO one line" }
+  capstone: { slug: TODO, brief: "TODO one line" }

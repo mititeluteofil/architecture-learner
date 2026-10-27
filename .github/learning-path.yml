@@ -27,3 +27,12 @@ auto_verify: true
 
 # Update buddy memory (update-buddy skill) after a successful verification (true|false).
 auto_update_buddy: true
+
+# Active masterplan (domain). Manifest: curriculum/masterplan.yaml or curriculum/masterplans/<id>/masterplan.yaml.
+masterplan: loan-servicing
+
+# Default stack for /kickoff and /verify (java today; more arrive with stack packs).
+stack: java
+
+# Comma list of stacks in play, e.g. java,python,ruby.
+stacks: java
