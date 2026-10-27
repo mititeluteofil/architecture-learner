@@ -36,10 +36,36 @@ type Profile = {
   streak_shields?: number;          // 0..3, derived by the same fold; absent = 0
   started_at: string | null;        // ISO date of session-01
   last_session_at: string | null;   // ISO date
-  achievements_unlocked: number;    // = unlocked.length
-  achievements_total: number;       // = definitions.length
+  achievements_unlocked: number;    // = unlocked entries of the current run
+  achievements_total: number;       // DERIVED, never hard-coded: common + polyglot + per-stack x stacks in play + stack-specific for stacks in play
+
+  // --- v2 (schema_version 2). All additive; a v1 reader ignores them. ---
+  schema_version?: 2;
+  run?: number;                     // 1-based; absent = 1
+  prestige?: number;                // = run - 1; drives the star count on titles
+  lifetime_xp?: number;             // Σ xp over all runs incl. progress/archive/*; = xp_total when no archive
+  global_level?: {                  // ladder over xp_total (rules.json global_levels, L1..L9)
+    id: "L1" | "L2" | "L3" | "L4" | "L5" | "L6" | "L7" | "L8" | "L9";
+    name: string;                   // ... "Architect" | "Principal" | "Distinguished" | "Fellow"
+    xp_in_level: number;
+    xp_to_next: number;             // 0 at L9
+  };
+  stacks?: {                        // one entry per stack in play in the current run
+    [stackId: string]: {            // "java" | "dotnet" | "node" | "python" | "ruby"
+      xp: number;                   // stack XP (common/polyglot achievement XP excluded)
+      level: { id: string; name: string; xp_in_level: number; xp_to_next: number; capped?: boolean };
+      mode: "hands-on" | "assisted";   // mode of the stack's latest session
+    };
+  };
+  titles?: {
+    headline: string;               // e.g. "Trilingual Journeyman", "★ Bilingual Staff", or "Apprentice · Java"
+    best_single: string;            // e.g. "Senior · Java"
+    combos: { level: string; count: number; title: string }[];   // every (stack-count, level) combination reached, best first
+  };
 };
 ```
+
+`level` stays an **alias of the active stack's level** (the stack of the latest session) on the stack ladder, so a v1 dashboard keeps working. A profile without the v2 fields is read as a single Java stack in run 1, `global_level` = `level`, `titles.headline` = `"<level name> · Java"`. The dashboard never computes levels itself except as that fallback; `tools/gamification-ref/compute.mjs` documents the algorithm.
 
 View preference (Focus vs Analytics mode) is **not** in `profile.json` — the dashboard cannot write there. It lives in the browser (`localStorage`, wrapped in try/catch, default Focus).
 
@@ -47,6 +73,7 @@ View preference (Focus vs Analytics mode) is **not** in `profile.json` — the d
 
 ```ts
 type AchievementTier = "domain-core" | "hexagonal" | "event-driven" | "cloud-infra";
+type AchievementScope = "common" | "per-stack" | "stack" | "polyglot";
 type AchievementDefinition = {
   id: string;                       // kebab-case stable identifier
   name: string;                     // display name
@@ -54,18 +81,34 @@ type AchievementDefinition = {
   xp: number;                       // XP added to the unlocking session's xp_earned
   description: string;
   criteria: string;                 // must be checkable with Bash/Grep/Read; ambiguous = never unlocks
+  scope?: AchievementScope;         // v2; absent = "common"
+  stack?: string;                   // only for scope "stack": the stack id
 };
 type AchievementUnlock = {
   id: string;
+  stack?: string | null;            // v2; null/absent for common + polyglot
+  run?: number;                     // v2; absent = 1
   unlocked_at: string;              // ISO datetime
   session_id: string;               // e.g., "session-06"
   evidence: string;                 // file path or command output snippet
 };
 type Achievements = {
-  definitions: AchievementDefinition[];
+  schema_version?: 2;
+  definitions: AchievementDefinition[];   // common + per-stack + polyglot only
   unlocked: AchievementUnlock[];
 };
 ```
+
+**Scopes and unlock keys.**
+
+| scope | key | where defined | earnable |
+|---|---|---|---|
+| `common` | `id` | `progress/achievements.json` | once per run |
+| `per-stack` | `id@stack` | `progress/achievements.json` | once in each stack |
+| `stack` | `id@stack` | `stacks/<id>/achievements.json` (same definition shape, plus `scope: "stack"` and `stack`) | once, in that stack |
+| `polyglot` | `id` | `progress/achievements.json` | once per run, needs 2+ stacks |
+
+The dashboard builds its catalogue by merging `progress/achievements.json` with the `stacks/<id>/achievements.json` of every stack in `profile.stacks` (java when `stacks` is absent). A definition is unlocked when `unlocked[]` has an entry with the same key in the current `run`. `achievements_total` is the size of that merged, scope-expanded catalogue (per-stack definitions counted once per stack in play); it is not a stored constant.
 
 ## `sessions/session-NN.json`
 
@@ -76,11 +119,18 @@ type GoalStatus = "done" | "in_progress" | "not_started";
 type XpEvent =
   | "session_ignition" | "micro_step" | "daily_acceptance" | "side_quest"
   | "adr" | "adr_landing" | "property_bug" | "mutation_score"
-  | "debrief" | "public_artifact";
+  | "debrief" | "public_artifact"
+  | "stack_ignition" | "comparison_note" | "diff_walkthrough" | "port_review";   // v2
 type Session = {
-  session: number;                  // 1-based; file name is session-NN (zero-padded)
+  session: number;                  // 1-based within a run; file name is session-NN (zero-padded)
   day: number;                      // 1..30
   project: string;
+  // v2 (schema_version 2). Absent on older files and then read as:
+  masterplan?: string;              // default "loan-servicing"
+  stack?: string;                   // default "java"
+  mode?: "hands-on" | "assisted";   // default "hands-on"
+  run?: number;                     // default 1
+  // Old files are never back-filled; the defaults are applied when reading.
   date: string;                     // ISO date (UTC) — the streak fold reads this
   duration_minutes: number;
   planned_minutes: number;          // typically 150
@@ -99,9 +149,12 @@ type Session = {
   };
   reflection: string;               // learner's freeform retro text — private, never synced
   buddy_questions_asked: string[];  // private, never synced
-  achievements_unlocked: { id: string; evidence: string }[];
+  achievements_unlocked: { id: string; evidence: string;
+                           stack?: string | null; scope?: AchievementScope; xp?: number }[];   // v2 adds stack/scope/xp
 };
 ```
+
+`xp_earned` stays the sum of everything awarded in the session. For the stack ladder, `xp` of entries with `scope` `common` or `polyglot` is subtracted (that XP is global-only).
 
 ## `feed.json` — pre-computed aggregates
 
@@ -121,6 +174,36 @@ type Feed = {
   level_progression:  { date: string; level_id: string; level_name: string; xp_total: number }[];
 };
 ```
+
+v2 (additive, optional): `stack_xp_timeseries: { date; session; stack; xp_total_stack }[]` for the per-stack ladders strip, and `hall_of_runs: HallRun[]` (see below). A feed without them is still valid.
+
+## v2 views (polyglot gamification)
+
+All read-only, from `profile.json`, `achievements.json`, the merged stack definitions and `feed.json`. Each degrades to today's single-ladder look when the v2 fields are absent.
+
+- **Stack ladders strip.** One row per entry in `profile.stacks`: stack label, level name, an `xp_in_level / (xp_in_level + xp_to_next)` bar, and an `assisted` chip (cap shown as a notch at L3 with `level.capped`) when `mode` is `assisted`. Above the strip, the global ladder (`global_level`, L1 to L9) as a wider bar with `xp_total`, and `lifetime_xp` as secondary text when it differs from `xp_total`.
+- **Title badges.** `titles.headline` as the primary badge next to the avatar/name, `titles.best_single` as a secondary badge, `titles.combos[]` as a collapsed list ("Bilingual Journeyman, Trilingual Journeyman"). Stars come with the strings (prestige is already in them); show `prestige` as a star count tooltip. Assisted stacks are drawn without the "counts toward titles" tick.
+- **Hall of runs.** One card per archived run from `progress/archive/<run-id>/` (`run`, `masterplan`, `xp_total`, final `titles.headline`, `global_level`, `achievements_unlocked`, date range), newest first, plus the live run as the top card. The archive is read-only. Until an archive exists the section is hidden.
+
+```ts
+type HallRun = {
+  run_id: string;                   // e.g. "run-1-loan-servicing"
+  run: number;
+  masterplan: string;
+  xp_total: number;
+  headline: string;
+  global_level_id: string;
+  achievements_unlocked: number;
+  started_at: string | null;
+  ended_at: string | null;
+};
+```
+
+- **Per-stack achievement grid.** In the Achievements artboard: rows are definitions, columns are the stacks in play (+ a "common" column). A `per-stack` or `stack` cell is lit when `id@stack` is unlocked in the current run; a `stack`-scope definition shows only in its own column (other cells blank, not locked). `common` and `polyglot` definitions span the row. Group by tier as before.
+
+## Cloud Sync fields (v2)
+
+`sessions` rows carry `masterplan, stack, mode, run`; `achievement_unlocks` is keyed `(learner, achievement_id, stack, run)` with `stack = ''` for common/polyglot; `profiles` adds `headline_title, global_level_id, lifetime_xp, prestige`; `/api/state` and `/api/leaderboard` expose them. Old records default as above (`java / hands-on / 1 / loan-servicing`).
 
 ## Dashboard views (two modes, one data contract)
 
@@ -172,7 +255,7 @@ Renders from `feed.json` + the just-ended session + the trailing 6 sessions.
 
 ## Versioning
 
-This contract is `v1`. Add a `schema_version: 1` field to each JSON file the next time `award-xp` writes it. Additive changes stay within `v1.x`; breaking changes only at `v2`.
+This contract was `v1` (`schema_version: 1`). The polyglot changes (stack/mode/run/masterplan, scoped achievements, stack and global ladders, titles) are additive, but files `award-xp` writes from now on carry `schema_version: 2`, and `rules.json` is `schema_version: 2`. A reader must treat every v2 field as optional with the defaults documented above, so v1 files keep rendering. Breaking changes need `v3`.
 
 ## Where the data comes from
 

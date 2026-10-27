@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "xp_events": {
     "session_ignition": 25,
     "micro_step": 20,
@@ -10,9 +10,14 @@
     "property_bug": 50,
     "mutation_score": 60,
     "debrief": 25,
-    "public_artifact": 200
+    "public_artifact": 200,
+    "stack_ignition": 50,
+    "comparison_note": 40,
+    "diff_walkthrough": 30,
+    "port_review": 20
   },
   "micro_step_max": 5,
+  "port_review_max": 3,
   "levels": [
     { "id": "L1", "name": "Apprentice", "min": 0, "max": 600 },
     { "id": "L2", "name": "Journeyman", "min": 601, "max": 1600 },
@@ -21,5 +26,19 @@
     { "id": "L5", "name": "Staff", "min": 5601, "max": 9000 },
     { "id": "L6", "name": "Architect", "min": 9001, "max": null }
   ],
+  "global_levels": [
+    { "id": "L1", "name": "Apprentice", "min": 0, "max": 600 },
+    { "id": "L2", "name": "Journeyman", "min": 601, "max": 1600 },
+    { "id": "L3", "name": "Engineer", "min": 1601, "max": 3200 },
+    { "id": "L4", "name": "Senior", "min": 3201, "max": 5600 },
+    { "id": "L5", "name": "Staff", "min": 5601, "max": 9000 },
+    { "id": "L6", "name": "Architect", "min": 9001, "max": 15000 },
+    { "id": "L7", "name": "Principal", "min": 15001, "max": 25000 },
+    { "id": "L8", "name": "Distinguished", "min": 25001, "max": 40000 },
+    { "id": "L9", "name": "Fellow", "min": 40001, "max": null }
+  ],
+  "title_prefixes": { "2": "Bilingual", "3": "Trilingual", "4": "Quadrilingual", "5": "Polyglot" },
+  "assisted": { "xp_multiplier": 0.5, "level_cap": "L3", "counts_for_titles": false },
+  "prestige": { "symbol": "★" },
   "shields": { "every": 3, "max": 3 }
 }

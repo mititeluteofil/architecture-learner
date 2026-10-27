@@ -5,11 +5,17 @@ on:
     paths:
       - 'tools/cloud-sync/**'
       - 'progress/rules.json'
+      - 'progress/achievements.json'
+      - 'stacks/*/achievements.json'
+      - 'tools/gamification-ref/**'
       - '.github/workflows/cloud-sync.yml'
   pull_request:
     paths:
       - 'tools/cloud-sync/**'
       - 'progress/rules.json'
+      - 'progress/achievements.json'
+      - 'stacks/*/achievements.json'
+      - 'tools/gamification-ref/**'
       - '.github/workflows/cloud-sync.yml'
   workflow_dispatch:
 
@@ -46,3 +52,7 @@ jobs:
 
       # /sync payload builder (zero-dep, node:test).
       - run: node --test "scripts/*.test.mjs"
+
+      # Level/title spec oracle for award-xp (zero-dep, node:test); run from the repo root.
+      - run: node --test "tools/gamification-ref/*.test.mjs"
+        working-directory: .

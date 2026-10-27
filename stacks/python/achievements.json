@@ -1,0 +1,46 @@
+{
+  "schema_version": 2,
+  "stack": "python",
+  "definitions": [
+    {
+      "id": "strict-typist",
+      "name": "Strict Typist",
+      "tier": "domain-core",
+      "xp": 50,
+      "scope": "stack",
+      "stack": "python",
+      "description": "mypy --strict (or pyright strict) is clean from P2 on.",
+      "criteria": "`mypy --strict` (or `pyright` with strict mode) exits 0 on every python project p[2-9]-*"
+    },
+    {
+      "id": "match-maker",
+      "name": "Match Maker",
+      "tier": "domain-core",
+      "xp": 75,
+      "scope": "stack",
+      "stack": "python",
+      "description": "match statement with >=3 class patterns in domain code.",
+      "criteria": "grep finds a `match` statement in python domain code with >=3 `case ClassName(` arms"
+    },
+    {
+      "id": "protocol-purist",
+      "name": "Protocol Purist",
+      "tier": "hexagonal",
+      "xp": 75,
+      "scope": "stack",
+      "stack": "python",
+      "description": "All P3 driven ports are typing.Protocol and import-linter is green.",
+      "criteria": "every driven port in the python P3 project is a class deriving from typing.Protocol AND `verify: arch p3` exits 0"
+    },
+    {
+      "id": "async-all-the-way",
+      "name": "Async All the Way",
+      "tier": "event-driven",
+      "xp": 100,
+      "scope": "stack",
+      "stack": "python",
+      "description": "Async endpoint through async repository, Testcontainers test green.",
+      "criteria": "P4/P5 python code has an async endpoint calling an async repository (no sync bridging) AND its Testcontainers-based test passes"
+    }
+  ]
+}

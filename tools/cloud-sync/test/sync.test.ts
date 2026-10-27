@@ -122,7 +122,8 @@ describe("GET /api/state", () => {
     const body = (await (await call(ADA, "/api/state")).json()) as any;
     expect(body.status).toBe("hydrated");
     expect(body.sessions).toEqual(sessions);
-    expect(body.unlocked_achievements).toEqual([unlock]);
+    // pre-v2 unlock: the server reports the defaults explicitly (stack null, run 1)
+    expect(body.unlocked_achievements).toEqual([{ ...unlock, stack: null, run: 1 }]);
     expect(body.profile.achievements_unlocked).toBe(1);
     expect(body.profile.xp_total).toBe(140);
   });
@@ -163,5 +164,126 @@ describe("routing", () => {
     expect(pre.status).toBe(204);
     expect(pre.headers.get("Access-Control-Allow-Origin")).toBe("https://dashboard.test");
     expect((await call(ADA, "/api/nope")).status).toBe(404);
+  });
+});
+
+describe("polyglot v2", () => {
+  const v2 = (n: number, xp: number, date: string, stack: string, extra: Record<string, unknown> = {}) =>
+    session(n, xp, date, { masterplan: "loan-servicing", stack, mode: "hands-on", run: 1, ...extra });
+
+  it("old records default to java / hands-on / run 1 / loan-servicing in the columns, session_json stays as sent", async () => {
+    await call(ADA, "/api/sync", { sessions: [session(1, 175, "2026-06-01")] });
+    const row = await env.DB.prepare("SELECT masterplan, stack, mode, run, session_json FROM sessions").first<any>();
+    expect(row).toMatchObject({ masterplan: "loan-servicing", stack: "java", mode: "hands-on", run: 1 });
+    for (const k of ["masterplan", "stack", "mode", "run"]) expect(JSON.parse(row.session_json)).not.toHaveProperty(k);
+
+    const { profile } = (await (await call(ADA, "/api/state")).json()) as any;
+    expect(profile.xp_total).toBe(175);
+    expect(profile.level.id).toBe("L1");
+    expect(profile.global_level.id).toBe("L1");
+    expect(profile.stacks.java).toMatchObject({ xp: 175, mode: "hands-on" });
+    expect(profile.titles.headline).toBe("Apprentice · Java");
+    expect(profile.run).toBe(1);
+    expect(profile.prestige).toBe(0);
+    expect(profile.lifetime_xp).toBe(175);
+  });
+
+  it("Java + Python fixture yields Bilingual Apprentice, per-stack levels and cached profile columns", async () => {
+    const res = await call(ADA, "/api/sync", {
+      sessions: [v2(1, 175, "2026-06-01", "java"), v2(2, 120, "2026-06-02", "python")],
+      unlocked_achievements: [
+        { id: "pure-core", stack: "python", run: 1, unlocked_at: "2026-06-02T10:00:00Z", session_id: "session-02", evidence: "e" },
+        { id: "decision-anchor", unlocked_at: "2026-06-02T10:00:00Z", session_id: "session-02", evidence: "e" },
+      ],
+    });
+    const { profile } = (await res.json()) as any;
+    expect(profile.xp_total).toBe(295);
+    expect(profile.stacks.java.level.id).toBe("L1");
+    expect(profile.stacks.python.level.id).toBe("L1");
+    expect(profile.titles.headline).toBe("Bilingual Apprentice");
+    expect(profile.titles.best_single).toBe("Apprentice · Java");
+    expect(profile.level.id).toBe("L1"); // alias of the active (latest) stack
+    expect(profile.achievements_unlocked).toBe(2);
+
+    const row = await env.DB.prepare("SELECT headline_title, global_level_id, lifetime_xp, prestige FROM profiles").first<any>();
+    expect(row).toEqual({ headline_title: "Bilingual Apprentice", global_level_id: "L1", lifetime_xp: 295, prestige: 0 });
+  });
+
+  it("unlocks are keyed by (id, stack, run): same id in two stacks is two rows, a replay is a no-op", async () => {
+    const unlock = (stack: string | null) => ({
+      id: "hex-vex",
+      stack,
+      unlocked_at: "2026-06-02T10:00:00Z",
+      session_id: "session-02",
+      evidence: "e",
+    });
+    const body = { sessions: [v2(1, 10, "2026-06-01", "java")], unlocked_achievements: [unlock("java"), unlock("python")] };
+    await call(ADA, "/api/sync", body);
+    await call(ADA, "/api/sync", body);
+    const rows = await env.DB.prepare("SELECT stack, run FROM achievement_unlocks ORDER BY stack").all<any>();
+    expect(rows.results).toEqual([
+      { stack: "java", run: 1 },
+      { stack: "python", run: 1 },
+    ]);
+
+    const state = (await (await call(ADA, "/api/state")).json()) as any;
+    expect(state.unlocked_achievements.map((u: any) => u.stack)).toEqual(["java", "python"]);
+  });
+
+  it("assisted stack is capped at L3 and does not feed the title prefix", async () => {
+    const { profile } = (await (
+      await call(ADA, "/api/sync", {
+        sessions: [
+          v2(1, 3300, "2026-06-01", "java"),
+          v2(2, 5000, "2026-06-02", "ruby", { mode: "assisted" }),
+          v2(3, 700, "2026-06-03", "python"),
+        ],
+      })
+    ).json()) as any;
+    expect(profile.stacks.ruby.level).toMatchObject({ id: "L3", capped: true });
+    expect(profile.titles.headline).toBe("Bilingual Journeyman");
+    expect(profile.titles.best_single).toBe("Senior · Java");
+  });
+
+  it("a fresh-start run restarts session numbers without colliding, keeps lifetime XP, adds stars", async () => {
+    await call(ADA, "/api/sync", { sessions: [v2(1, 5000, "2026-06-01", "java", { run: 1 })] });
+    const { profile } = (await (
+      await call(ADA, "/api/sync", {
+        sessions: [v2(1, 700, "2026-06-02", "java", { run: 2 }), v2(2, 700, "2026-06-03", "python", { run: 2 })],
+      })
+    ).json()) as any;
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM sessions").first<any>()).n).toBe(3);
+    expect(profile).toMatchObject({ run: 2, prestige: 1, xp_total: 1400, lifetime_xp: 6400 });
+    expect(profile.titles.headline).toBe("★ Bilingual Journeyman");
+    expect(profile.streak_days).toBe(3); // streak is a habit across runs
+  });
+
+  it.each([
+    [{ stack: "Py Thon" }, "invalid stack"],
+    [{ mode: "turbo" }, "invalid mode"],
+    [{ run: 0 }, "invalid run"],
+    [{ masterplan: "../x" }, "invalid masterplan"],
+  ])("rejects %j with 400 and writes nothing", async (bad, msg) => {
+    const res = await call(ADA, "/api/sync", { sessions: [session(1, 10, "2026-06-01", bad)] });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as any).error).toContain(msg);
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM sessions").first<any>()).n).toBe(0);
+  });
+
+  it("leaderboard exposes the v2 columns and can rank by lifetime XP", async () => {
+    await call(ADA, "/api/sync", {
+      sessions: [v2(1, 5000, "2026-05-01", "java", { run: 1 }), v2(1, 100, "2026-06-01", "java", { run: 2 })],
+      leaderboard_opt_in: true,
+    });
+    await call(BOB, "/api/sync", { sessions: [v2(1, 900, "2026-06-01", "java")], leaderboard_opt_in: true });
+
+    const byRun = (await (await call(BOB, "/api/leaderboard")).json()) as any;
+    expect(byRun.rank).toBe("run");
+    expect(byRun.cohort.map((c: any) => c.display_name)).toEqual(["Bob Builder", "Ada Lovelace"]);
+
+    const byLife = (await (await call(BOB, "/api/leaderboard?rank=lifetime")).json()) as any;
+    expect(byLife.cohort.map((c: any) => c.display_name)).toEqual(["Ada Lovelace", "Bob Builder"]);
+    expect(byLife.cohort[0]).toMatchObject({ lifetime_xp: 5100, prestige: 1, global_level_id: "L1" });
+    expect(byLife.cohort[0].headline_title).toBeTruthy();
   });
 });

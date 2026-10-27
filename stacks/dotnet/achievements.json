@@ -1,0 +1,46 @@
+{
+  "schema_version": 2,
+  "stack": "dotnet",
+  "definitions": [
+    {
+      "id": "sharp-records",
+      "name": "Sharp Records",
+      "tier": "domain-core",
+      "xp": 50,
+      "scope": "stack",
+      "stack": "dotnet",
+      "description": "P2 domain uses records with `required` members.",
+      "criteria": "P2 dotnet project has >=1 `record` type with >=1 `required` member AND day-06 verification all_passed in stack dotnet"
+    },
+    {
+      "id": "null-and-void",
+      "name": "Null and Void",
+      "tier": "hexagonal",
+      "xp": 75,
+      "scope": "stack",
+      "stack": "dotnet",
+      "description": "Nullable reference types on, warnings as errors, zero warnings in P3.",
+      "criteria": "P3 dotnet project(s) set <Nullable>enable</Nullable> and <TreatWarningsAsErrors>true</TreatWarningsAsErrors> AND `verify: build p3` exits 0"
+    },
+    {
+      "id": "ahead-of-time",
+      "name": "Ahead of Time",
+      "tier": "cloud-infra",
+      "xp": 100,
+      "scope": "stack",
+      "stack": "dotnet",
+      "description": "P4 service published with Native AOT starts and answers /health/ready.",
+      "criteria": "P4 dotnet project has PublishAot=true AND the AOT-published binary starts and GET /health/ready returns 200"
+    },
+    {
+      "id": "state-of-the-saga",
+      "name": "State of the Saga",
+      "tier": "event-driven",
+      "xp": 100,
+      "scope": "stack",
+      "stack": "dotnet",
+      "description": "P6 saga state machine with a green compensation test.",
+      "criteria": "P6 dotnet project has a saga state machine type AND a test exercising a compensation step passes (`verify: test p6` exits 0 with that test named in evidence)"
+    }
+  ]
+}

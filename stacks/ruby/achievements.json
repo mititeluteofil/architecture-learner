@@ -1,0 +1,46 @@
+{
+  "schema_version": 2,
+  "stack": "ruby",
+  "definitions": [
+    {
+      "id": "off-the-rails",
+      "name": "Off the Rails",
+      "tier": "hexagonal",
+      "xp": 100,
+      "scope": "stack",
+      "stack": "ruby",
+      "description": "P3 domain has zero ActiveRecord references and Packwerk is green.",
+      "criteria": "`grep -r ActiveRecord` over the ruby P3 domain package returns 0 matches AND `verify: arch p3` exits 0"
+    },
+    {
+      "id": "signed-sealed",
+      "name": "Signed & Sealed",
+      "tier": "domain-core",
+      "xp": 75,
+      "scope": "stack",
+      "stack": "ruby",
+      "description": "RBS/Steep (or Sorbet) typecheck passes on the domain.",
+      "criteria": "`steep check` (or `srb tc`) exits 0 over the ruby domain package"
+    },
+    {
+      "id": "in-case-of-pattern",
+      "name": "In Case of Pattern",
+      "tier": "domain-core",
+      "xp": 75,
+      "scope": "stack",
+      "stack": "ruby",
+      "description": "case/in with deconstruct and >=3 arms in the domain.",
+      "criteria": "grep finds a `case`/`in` expression in ruby domain code with >=3 `in` arms on a type defining deconstruct or deconstruct_keys"
+    },
+    {
+      "id": "mutant-slayer",
+      "name": "Mutant Slayer",
+      "tier": "domain-core",
+      "xp": 100,
+      "scope": "stack",
+      "stack": "ruby",
+      "description": "mutant kill rate of at least 80% on a domain module.",
+      "criteria": "`mutant run` on one ruby domain module reports kill rate >=80%"
+    }
+  ]
+}
