@@ -74,6 +74,11 @@ jobs:
       target_project: ${{ steps.target.outputs.target_project }}
       push_base: ${{ steps.changes.outputs.push_base }}
       changed_main_projects: ${{ steps.changes.outputs.changed_main_projects }}
+      masterplan: ${{ steps.cfg.outputs.masterplan }}
+      stack: ${{ steps.cfg.outputs.stack }}
+      configured_stacks: ${{ steps.cfg.outputs.stacks }}
+      stacks: ${{ steps.detect.outputs.stacks }}
+      setups: ${{ steps.detect.outputs.setups }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,6 +108,19 @@ jobs:
           projects=$(git diff --name-only "$BEFORE" HEAD -- projects | grep '/src/main/' | cut -d/ -f2 | sort -u | paste -sd, - || true)
           echo "changed_main_projects=$projects" >> "$GITHUB_OUTPUT"
           echo "Production code changed in: ${projects:-<none>}"
+
+      # Stacks touched by the session diff (configured `stacks` when the diff has none, or on manual runs).
+      # `setups` drives the per-stack toolchain steps of the jobs below; java-only diffs yield `java`.
+      - name: Detect stacks in the diff
+        id: detect
+        env:
+          BASE: ${{ steps.changes.outputs.push_base }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            python3 .github/scripts/learning_loop.py detect-stacks "--base=$BASE" --head HEAD
+          else
+            python3 .github/scripts/learning_loop.py detect-stacks --config-only
+          fi
 
       - name: Dashboard (before this run)
         run: python3 .github/scripts/learning_loop.py dashboard --out "$OUT_DIR/dashboard-before.md" --title "🎮 Learning Loop — where you stand"
@@ -163,10 +181,15 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/setup-java@v4
+        if: ${{ contains(format(',{0},', needs.context.outputs.setups), ',java,') }}
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
+
+      - uses: ./.github/actions/setup-stacks
+        with:
+          setups: ${{ needs.context.outputs.setups }}
 
       - name: Guard — PLAN.md must exist
         env:
@@ -217,10 +240,15 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/setup-java@v4
+        if: ${{ contains(format(',{0},', needs.context.outputs.setups), ',java,') }}
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
+
+      - uses: ./.github/actions/setup-stacks
+        with:
+          setups: ${{ needs.context.outputs.setups }}
 
       - name: Test-scaffolder for the projects you touched
         uses: JetBrains/junie-github-action@v1
@@ -282,10 +310,15 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@v4
+        if: ${{ contains(format(',{0},', needs.context.outputs.setups), ',java,') }}
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
+
+      - uses: ./.github/actions/setup-stacks
+        with:
+          setups: ${{ needs.context.outputs.setups }}
 
       - name: Select tests added/changed this session
         id: select
@@ -389,10 +422,15 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/setup-java@v4
+        if: ${{ contains(format(',{0},', needs.context.outputs.setups), ',java,') }}
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
+
+      - uses: ./.github/actions/setup-stacks
+        with:
+          setups: ${{ needs.context.outputs.setups }}
 
       - uses: actions/download-artifact@v4
         with:
