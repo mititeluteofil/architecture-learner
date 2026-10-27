@@ -45,4 +45,4 @@ If the learner asks you (the main orchestrator) to "just write it", redirect:
 - Don't write into `.claude/buddy/learner-profile.md` or `session-log.md` outside the `update-buddy` skill.
 - Don't write into `progress/profile.json` outside the `award-xp` skill.
 - Don't run `terraform apply` against real AWS without an explicit confirmation. LocalStack daily; real AWS only Day 29.
-- Don't push to a branch other than `claude/plan-java-learning-series-QkoGV` without explicit permission.
+- Don't push to a branch other than `claude/plan-java-learning-series-QkoGV` or `polyglot` without explicit permission.
