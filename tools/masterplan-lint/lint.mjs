@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const KNOWN_VERBS = ['build', 'discipline', 'vectors', 'arch', 'property', 'contract', 'image'];
+export const KNOWN_VERBS = ['build', 'test', 'day', 'discipline', 'vectors', 'arch', 'property', 'contract', 'image', 'image-size', 'idempotency', 'chaos'];
 
 // ---------------------------------------------------------------- YAML subset
 // Supported: block maps, block lists, flow maps { a: b }, flow lists [a, b], quoted/plain scalars, # comments.
@@ -120,7 +120,7 @@ export function parseYaml(text) {
   return result;
 }
 
-function stripComment(line) {
+export function stripComment(line) {
   let q = null;
   for (let i = 0; i < line.length; i++) {
     const c = line[i];

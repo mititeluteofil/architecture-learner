@@ -34,3 +34,14 @@ tooling:
   otel: "@opentelemetry/sdk-node"
   image: "Multi-stage Dockerfile on a slim or distroless Node base"
 decimal_type: "decimal.js or big.js (never the number type)"
+# Keys read by achievement criteria (progress/achievements.json) and the CI planner.
+property_lib: fast-check
+# regex over the P3 PLAN.md/domain source; {core_aggregate} comes from the masterplan manifest
+aggregate_marker: '(class|interface|type) {core_aggregate}([^A-Za-z0-9_]|$)'
+# HEURISTIC threshold, not a measurement: tune after the first real image build (see verify.yaml image-size)
+image_size_max_mb: 200
+ci:
+  test_glob: 'projects/.+/test/.+\.(js|ts|mjs|cjs)$'
+  test_cmd: 'npm --prefix {dir} ci && npm --prefix {dir} test'
+  setup: node
+  manifest: 'package.json'

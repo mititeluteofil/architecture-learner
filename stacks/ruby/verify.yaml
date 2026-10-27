@@ -7,3 +7,12 @@ arch: cd {dir} && bundle exec packwerk check
 property: cd {dir} && bundle exec rspec --tag property
 contract: cd {dir} && bundle exec rspec --tag pact
 image: docker build -t loan-service {dir}
+# --- Wave 4A additions. All are best-effort heuristics, UNPROVEN until a project of this stack exists. ---
+# test/day: plain test run; `day` backs `verify: day p1-end` (day-end checklist == the slot's build).
+test: cd {dir} && bundle exec rspec
+day: cd {dir} && bundle exec rspec
+# idempotency/chaos rely on a test-naming (or tag) convention the learner's tests must follow.
+idempotency: cd {dir} && bundle exec rspec --tag idempotency
+chaos: cd {dir} && bundle exec rspec --tag chaos
+# image-size assumes the image is tagged loan-service (the image verb tags it for docker-based stacks; jib/dotnet need an image-name setting).
+image-size: test "$(docker image inspect loan-service --format '{{.Size}}')" -le "$(( {image_size_max_mb} * 1024 * 1024 ))"

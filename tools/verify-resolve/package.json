@@ -1,0 +1,8 @@
+{
+  "name": "verify-resolve",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dependency-free resolver from day-file verification items to stack-pack shell commands (never executes).",
+  "scripts": { "test": "node --test" }
+}

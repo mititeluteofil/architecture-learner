@@ -35,3 +35,14 @@ tooling:
   otel: "OpenTelemetry Java agent / Micrometer"
   image: "Jib (Maven plugin); plain Dockerfile only for sidecars"
 decimal_type: java.math.BigDecimal
+# Keys read by achievement criteria (progress/achievements.json) and the CI planner.
+property_lib: jqwik
+# regex over the P3 PLAN.md/domain source; {core_aggregate} comes from the masterplan manifest
+aggregate_marker: '(final )?class {core_aggregate}([^A-Za-z0-9_]|$)'
+# HEURISTIC threshold, not a measurement: tune after the first real image build (see verify.yaml image-size)
+image_size_max_mb: 250
+ci:
+  test_glob: 'projects/.+/src/test/java/.+\.java$'
+  test_cmd: './mvnw -pl {dir} -am test'
+  setup: java
+  manifest: 'pom.xml'

@@ -7,3 +7,12 @@ arch: ./mvnw -pl {dir} -am test -Dtest='*ArchitectureTest'
 property: ./mvnw -pl {dir} -am test -Dtest='*Properties,*Property'
 contract: ./mvnw -pl {dir} -am verify -Dtest='*Pact*,*Contract*'
 image: ./mvnw -pl {dir} -am jib:dockerBuild
+# --- Wave 4A additions. All are best-effort heuristics, UNPROVEN until a project of this stack exists. ---
+# test/day: plain test run; `day` backs `verify: day p1-end` (day-end checklist == the slot's build).
+test: ./mvnw -pl {dir} -am test
+day: ./mvnw -pl {dir} -am verify
+# idempotency/chaos rely on a test-naming (or tag) convention the learner's tests must follow.
+idempotency: ./mvnw -pl {dir} -am test -Dtest='*Idempoten*'
+chaos: ./mvnw -pl {dir} -am verify -Dtest='*Chaos*,*Rollback*'
+# image-size assumes the image is tagged loan-service (the image verb tags it for docker-based stacks; jib/dotnet need an image-name setting).
+image-size: test "$(docker image inspect loan-service --format '{{.Size}}')" -le "$(( {image_size_max_mb} * 1024 * 1024 ))"

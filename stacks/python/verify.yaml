@@ -7,3 +7,12 @@ arch: uv run --directory {dir} lint-imports
 property: uv run --directory {dir} pytest -q -k property
 contract: uv run --directory {dir} pytest -q -k pact
 image: docker build -t loan-service {dir}
+# --- Wave 4A additions. All are best-effort heuristics, UNPROVEN until a project of this stack exists. ---
+# test/day: plain test run; `day` backs `verify: day p1-end` (day-end checklist == the slot's build).
+test: uv run --directory {dir} pytest -q
+day: uv run --directory {dir} pytest -q
+# idempotency/chaos rely on a test-naming (or tag) convention the learner's tests must follow.
+idempotency: uv run --directory {dir} pytest -q -k idempoten
+chaos: uv run --directory {dir} pytest -q -k 'chaos or rollback'
+# image-size assumes the image is tagged loan-service (the image verb tags it for docker-based stacks; jib/dotnet need an image-name setting).
+image-size: test "$(docker image inspect loan-service --format '{{.Size}}')" -le "$(( {image_size_max_mb} * 1024 * 1024 ))"
