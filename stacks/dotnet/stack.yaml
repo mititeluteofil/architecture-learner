@@ -1,0 +1,36 @@
+id: dotnet
+name: .NET
+language: C#
+steps:
+  baseline:
+    version: "C# 7.3 (netstandard2.0 / net48-compatible)"
+    spotlight: "Classes with readonly fields; no records, no nullable reference types, no switch expressions"
+  modern:
+    version: "C# 12 / .NET 8"
+    spotlight: "Records, init-only members, pattern-matching switch expressions, nullable reference types"
+frameworks:
+  default: aspnet-minimal-api
+  aspnet-minimal-api: "ASP.NET Core 8 Minimal API"
+  controllers: "ASP.NET Core MVC controllers (variant)"
+marker:
+  comment: '// LEARNER: <hint>'
+  config_comment: '# LEARNER: <hint>'
+  stub_throw: 'throw new NotImplementedException("LEARNER: implement - <hint>");'
+  failing_test: 'Assert.Fail("LEARNER: <hint>");'
+layout:
+  manifest: "*.csproj (one solution per project dir)"
+  src: src
+  tests: tests
+  project_dir: "projects/p<N>-<slug>/dotnet/"
+  registration: "dotnet sln add <csproj>"
+tooling:
+  test: "xUnit + FluentAssertions"
+  property: "FsCheck (or CsCheck)"
+  arch: NetArchTest
+  mutation: Stryker.NET
+  contract: PactNet
+  migrations: "DbUp or FluentMigrator over the shared SQL"
+  kafka: Confluent.Kafka
+  otel: OpenTelemetry.Extensions.Hosting
+  image: "dotnet publish /t:PublishContainer (SDK container support); plain Dockerfile only for sidecars"
+decimal_type: System.Decimal
