@@ -1,0 +1,18 @@
+# abstract verb -> command template; {dir} = project directory
+build: npm --prefix {dir} ci && npm --prefix {dir} test
+discipline.baseline: test "$(grep -rEw 'import|interface|readonly' --include=*.js {dir}/src | wc -l)" -eq 0 && test -z "$(find {dir}/src -name '*.ts')"
+discipline.modern: npm --prefix {dir} exec -- tsc --noEmit -p {dir}
+vectors: npm --prefix {dir} test -- --test-name-pattern=vector
+arch: npm --prefix {dir} exec -- depcruise --config {dir}/.dependency-cruiser.cjs {dir}/src
+property: npm --prefix {dir} test -- --test-name-pattern=property
+contract: npm --prefix {dir} test -- --test-name-pattern=pact
+image: docker build -t loan-service {dir}
+# --- Wave 4A additions. All are best-effort heuristics, UNPROVEN until a project of this stack exists. ---
+# test/day: plain test run; `day` backs `verify: day p1-end` (day-end checklist == the slot's build).
+test: npm --prefix {dir} test
+day: npm --prefix {dir} ci && npm --prefix {dir} test
+# idempotency/chaos rely on a test-naming (or tag) convention the learner's tests must follow.
+idempotency: npm --prefix {dir} test -- --test-name-pattern=idempoten
+chaos: npm --prefix {dir} test -- --test-name-pattern='chaos|rollback'
+# image-size assumes the image is tagged loan-service (the image verb tags it for docker-based stacks; jib/dotnet need an image-name setting).
+image-size: test "$(docker image inspect loan-service --format '{{.Size}}')" -le "$(( {image_size_max_mb} * 1024 * 1024 ))"

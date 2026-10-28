@@ -74,6 +74,11 @@ jobs:
       target_project: ${{ steps.target.outputs.target_project }}
       push_base: ${{ steps.changes.outputs.push_base }}
       changed_main_projects: ${{ steps.changes.outputs.changed_main_projects }}
+      masterplan: ${{ steps.cfg.outputs.masterplan }}
+      stack: ${{ steps.cfg.outputs.stack }}
+      configured_stacks: ${{ steps.cfg.outputs.stacks }}
+      stacks: ${{ steps.detect.outputs.stacks }}
+      setups: ${{ steps.detect.outputs.setups }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -100,9 +105,22 @@ jobs:
             BEFORE=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD~1)
           fi
           echo "push_base=$BEFORE" >> "$GITHUB_OUTPUT"
-          projects=$(git diff --name-only "$BEFORE" HEAD -- projects | grep '/src/main/' | cut -d/ -f2 | sort -u | paste -sd, - || true)
+          projects=$(python3 .github/scripts/learning_loop.py changed-projects --base "$BEFORE" --head HEAD)
           echo "changed_main_projects=$projects" >> "$GITHUB_OUTPUT"
           echo "Production code changed in: ${projects:-<none>}"
+
+      # Stacks touched by the session diff (configured `stacks` when the diff has none, or on manual runs).
+      # `setups` drives the per-stack toolchain steps of the jobs below; java-only diffs yield `java`.
+      - name: Detect stacks in the diff
+        id: detect
+        env:
+          BASE: ${{ steps.changes.outputs.push_base }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            python3 .github/scripts/learning_loop.py detect-stacks "--base=$BASE" --head HEAD
+          else
+            python3 .github/scripts/learning_loop.py detect-stacks --config-only
+          fi
 
       - name: Dashboard (before this run)
         run: python3 .github/scripts/learning_loop.py dashboard --out "$OUT_DIR/dashboard-before.md" --title "🎮 Learning Loop — where you stand"
@@ -133,8 +151,8 @@ jobs:
             Learner path settings (from `.github/learning-path.yml`):
             - daily budget: ${{ needs.context.outputs.planned_minutes }} min, pace: ${{ needs.context.outputs.pace }}, track: ${{ needs.context.outputs.track }}
             - scaffold level: ${{ needs.context.outputs.scaffold_level }}
-              (thorough = full skeleton manifest; minimal = module/pom/acceptance tests only, learner designs ports & packages;
-               contract-only = only ArchUnit rules + contract/acceptance tests in the manifest)
+              (thorough = full skeleton manifest; minimal = project manifest/acceptance tests only, learner designs ports & packages;
+               contract-only = only architecture-rule + contract/acceptance tests in the manifest)
 
             Read first: `curriculum/day-by-day/day-NN.md` for the project's days (if present), the previous project's `PLAN.md`,
             `.claude/buddy/overview.md`, and the learner's ADRs in `curriculum/adr/` (respect decisions already taken).
@@ -148,7 +166,7 @@ jobs:
             Add a "## Time budget" section that splits the project's work into sessions that fit the daily budget above
             (Phase A: design & domain core, Phase B: adapters & verification).
 
-            Only create/modify `projects/<folder>/PLAN.md`. Do not touch progress/, .claude/buddy/, or any Java source.
+            Only create/modify `projects/<folder>/PLAN.md`. Do not touch progress/, .claude/buddy/, or any production source.
             PR title: "📐 PLAN ${{ needs.context.outputs.target_project }} (${{ github.event.inputs.stage }})". In the PR body list the ADR
             questions and say: "Review/edit PLAN.md, merge, then run Learning Loop → scaffold-all".
 
@@ -163,10 +181,15 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/setup-java@v4
+        if: ${{ contains(format(',{0},', needs.context.outputs.setups), ',java,') }}
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
+
+      - uses: ./.github/actions/setup-stacks
+        with:
+          setups: ${{ needs.context.outputs.setups }}
 
       - name: Guard — PLAN.md must exist
         env:
@@ -184,16 +207,19 @@ jobs:
           create_new_branch_for_pr: "true"
           prompt: |
             You are the SCAFFOLDING SWARM orchestrator for this learning repository. Obey `CLAUDE.md`: generate skeletons only,
-            leave `// LEARNER: <hint>` (Java) and `# LEARNER: <hint>` (infra) markers, NEVER write business logic.
+            leave `LEARNER: <hint>` markers (in the stack pack's comment syntax from `stacks/<stack>/stack.yaml`; `# LEARNER:` in infra),
+            NEVER write business logic.
 
             Project: `${{ needs.context.outputs.target_project }}` (resolve folder from `curriculum/00-overview.md`), plan: its `PLAN.md`.
             Stage: `${{ github.event.inputs.stage }}`. Scaffold level: `${{ needs.context.outputs.scaffold_level }}`
-            (thorough = everything in the manifest; minimal = module, pom.xml, package dirs and acceptance-level stubs only;
-             contract-only = module + pom.xml only, no production stubs).
+            (thorough = everything in the manifest; minimal = project manifest, source dirs and acceptance-level stubs only;
+             contract-only = project manifest only, no production stubs).
+            Target stack(s): `${{ needs.context.outputs.stacks }}` — read `stacks/<stack>/{stack.yaml,idioms.md,verify.yaml}`.
 
             Run the phases strictly in this order, skipping those not selected by the stage:
-            1. code-scaffolder (stages scaffold-code, scaffold-all): follow `.claude/agents/code-scaffolder.md` exactly, register
-               the module in the root `pom.xml`, then run `mvn -B -pl projects/<folder> -am compile` as a smoke check.
+            1. code-scaffolder (stages scaffold-code, scaffold-all): follow `.claude/agents/code-scaffolder.md` exactly, perform the
+               pack's `layout.registration` step, then run the pack's `build` command from `stacks/<stack>/verify.yaml`
+               (with `{dir}` = the project directory) as a smoke check.
             2. infra-scaffolder (stages scaffold-infra, scaffold-all): follow `.claude/agents/infra-scaffolder.md` exactly.
                Do NOT modify `.github/workflows/learning-loop.yml` or `.github/scripts/`.
 
@@ -217,10 +243,15 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/setup-java@v4
+        if: ${{ contains(format(',{0},', needs.context.outputs.setups), ',java,') }}
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
+
+      - uses: ./.github/actions/setup-stacks
+        with:
+          setups: ${{ needs.context.outputs.setups }}
 
       - name: Test-scaffolder for the projects you touched
         uses: JetBrains/junie-github-action@v1
@@ -233,12 +264,17 @@ jobs:
             Scope: ONLY these project folders under `projects/`: `${{ needs.context.outputs.changed_main_projects }}`.
             Changed production files this push: run `git diff --name-only ${{ needs.context.outputs.push_base }} HEAD -- projects`.
 
-            Be idempotent: generate test skeletons ONLY for production types (or new behaviours visible in their javadoc /
-            `// LEARNER:` hints / PLAN.md) that have no corresponding test yet. Never rewrite, rename or delete existing tests —
-            the learner may already have filled them in. Bodies are always `fail("LEARNER: <hint>")`.
-            Never edit anything under `src/main`. If nothing is missing, change nothing.
-            Confirm compilation with `mvn -B -pl projects/<folder> -am test-compile` (use `-f projects/<folder>/pom.xml` if the
-            module is not registered in the root pom). Do not commit or push — the workflow commits for you.
+            Detect each project's stack from its path (`projects/<name>/<stack>/...`; a project without a stack segment is the
+            legacy Java layout) and read `stacks/<stack>/{stack.yaml,idioms.md}`.
+
+            Be idempotent: generate test skeletons ONLY for production types (or new behaviours visible in their doc comments /
+            `LEARNER:` hints / PLAN.md) that have no corresponding test yet. Never rewrite, rename or delete existing tests —
+            the learner may already have filled them in. Bodies always use the pack's failing-test idiom
+            (`marker.test_fail` in `stack.yaml`, carrying `LEARNER: <hint>`).
+            Never edit production source (the pack's `layout.src`). If nothing is missing, change nothing.
+            Confirm the tests compile/collect using the pack's `ci.test_cmd` or `build` command (Java: `mvn -B -pl projects/<folder>
+            -am test-compile`, or `-f projects/<folder>/pom.xml` if the module is not registered in the root pom).
+            Do not commit or push — the workflow commits for you.
 
       - name: Commit test skeletons
         id: commit
@@ -247,7 +283,10 @@ jobs:
         run: |
           git config user.name "learning-loop[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- ':(glob)projects/**/src/test/**'
+          # stage test files of any stack (stack-aware filter in learning_loop.py)
+          { git diff --name-only -- projects; git ls-files --others --exclude-standard -- projects; } |
+            python3 .github/scripts/learning_loop.py filter-tests |
+            tr '\n' '\0' | xargs -r -0 git add --
           echo "added=$(git diff --cached --name-only --diff-filter=A | paste -sd, -)" >> "$GITHUB_OUTPUT"
           if ! git diff --cached --quiet; then
             git commit -m "test: scaffold session test skeletons ${BOT_TAG}"
@@ -282,10 +321,15 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@v4
+        if: ${{ contains(format(',{0},', needs.context.outputs.setups), ',java,') }}
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
+
+      - uses: ./.github/actions/setup-stacks
+        with:
+          setups: ${{ needs.context.outputs.setups }}
 
       - name: Select tests added/changed this session
         id: select
@@ -389,10 +433,15 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/setup-java@v4
+        if: ${{ contains(format(',{0},', needs.context.outputs.setups), ',java,') }}
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
+
+      - uses: ./.github/actions/setup-stacks
+        with:
+          setups: ${{ needs.context.outputs.setups }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -403,6 +452,7 @@ jobs:
         run: python3 .github/scripts/learning_loop.py snapshot
 
       - name: Maven wrapper fallback (day files call ./mvnw)
+        if: ${{ contains(format(',{0},', needs.context.outputs.setups), ',java,') }}
         run: |
           if [ ! -x ./mvnw ]; then
             printf '#!/bin/sh\nexec mvn -B -ntp "$@"\n' > mvnw

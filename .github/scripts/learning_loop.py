@@ -2,7 +2,8 @@
 """Deterministic helpers for .github/workflows/learning-loop.yml.
 
 Stdlib only. Sub-commands:
-  config                         -> learning-path.yml + profile.json as step outputs
+  config                         -> learning-path.yml + profile.json as step outputs (incl. masterplan / stack / stacks)
+  detect-stacks [--base --head]  -> stacks touched by the session diff (else the configured `stacks`) + toolchain setups
   session-tests --base --head    -> pick test classes added/changed this session, grouped by module
   run-tests                      -> run only the session's tests, classify results (passed / LEARNER-locked / real failures)
   verify --day N                 -> run the `## Verification` block of curriculum/day-by-day/day-NN.md
@@ -20,6 +21,7 @@ import glob
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -32,11 +34,13 @@ ACHIEVEMENTS_FILE = os.path.join(ROOT, "progress", "achievements.json")
 FEED_FILE = os.path.join(ROOT, "progress", "feed.json")
 DEBRIEF_SHA_FILE = os.path.join(ROOT, ".claude", "buddy", ".last-debrief-sha")
 
-LEVELS = [
+# Fallback only when progress/rules.json is unreadable; the real ladder lives in rules.json (see load_levels).
+FALLBACK_LEVELS = [
     ("L1", "Apprentice", 0), ("L2", "Journeyman", 301), ("L3", "Engineer", 801),
     ("L4", "Senior", 1601), ("L5", "Staff", 2801), ("L6", "Architect", 4501),
 ]
-LEVEL_ICONS = {"L1": "🪨", "L2": "🔨", "L3": "⚙️", "L4": "🛡️", "L5": "🏛️", "L6": "👑"}
+LEVEL_ICONS = {"L1": "🪨", "L2": "🔨", "L3": "⚙️", "L4": "🛡️", "L5": "🏛️", "L6": "👑",
+               "L7": "🧙", "L8": "🌟", "L9": "🏆"}
 NULL_SHA = "0" * 40
 MANIFEST_FILE = os.path.join(OUT, "run-manifest.json")
 TRACKS = {
@@ -95,6 +99,7 @@ def load_config():
     cfg = {
         "planned_minutes": "150", "pace": "sprint", "track": "full", "scaffold_level": "thorough",
         "review_tone": "honest", "auto_verify": "true", "auto_update_buddy": "true",
+        "masterplan": "loan-servicing", "stack": "java", "stacks": "java",
     }
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, encoding="utf-8") as fh:
@@ -104,6 +109,250 @@ def load_config():
                     key, value = line.split(":", 1)
                     cfg[key.strip()] = value.strip().strip('"').strip("'")
     return cfg
+
+
+# --------------------------------------------------------------------------- YAML subset + stack packs
+
+def _strip_comment(line):
+    """Drop a trailing `# comment`, ignoring `#` inside single/double quotes."""
+    quote = None
+    for i, ch in enumerate(line):
+        if quote:
+            if ch == quote:
+                quote = None
+        elif ch in "'\"":
+            quote = ch
+        elif ch == "#" and (i == 0 or line[i - 1] in " \t"):
+            return line[:i]
+    return line
+
+
+def _scalar(text):
+    text = text.strip()
+    if len(text) >= 2 and text[0] == '"' and text[-1] == '"':
+        try:
+            return json.loads(text)
+        except ValueError:
+            return text[1:-1]
+    if len(text) >= 2 and text[0] == "'" and text[-1] == "'":
+        return text[1:-1].replace("''", "'")
+    return text
+
+
+_KEY_LINE = re.compile(r'^\s*("[^"]*"|\'[^\']*\'|[^:\s][^:]*?)\s*:(?:\s+(.*))?$')
+
+
+def parse_yaml_subset(text):
+    """Minimal reader: nested `key: value` maps by indentation, quoted/plain scalars, `|`/`>` block scalars.
+
+    Lists, flow maps (`{...}`) and anchors are not interpreted: list lines are skipped and flow values stay plain
+    strings, so unknown constructs never raise. Enough for stacks/<id>/stack.yaml and .github/learning-path.yml.
+    """
+    root = {}
+    stack = [(-1, root)]
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        line = _strip_comment(lines[i]).rstrip()
+        i += 1
+        if not line.strip() or line.lstrip().startswith("- ") or line.strip() == "---":
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        m = _KEY_LINE.match(line)
+        if not m:
+            continue
+        key, value = _scalar(m.group(1)), (m.group(2) or "").strip()
+        while len(stack) > 1 and indent <= stack[-1][0]:
+            stack.pop()
+        parent = stack[-1][1]
+        if value == "":
+            child = {}
+            parent[key] = child
+            stack.append((indent, child))
+        elif value in ("|", ">", "|-", ">-"):
+            block = []
+            while i < len(lines) and (not lines[i].strip() or len(lines[i]) - len(lines[i].lstrip(" ")) > indent):
+                block.append(lines[i].strip())
+                i += 1
+            parent[key] = (" " if value.startswith(">") else "\n").join(block).strip()
+        else:
+            parent[key] = _scalar(value)
+    return root
+
+
+def stacks_dir():
+    return os.path.join(ROOT, "stacks")
+
+
+def known_stacks():
+    try:
+        return sorted(d for d in os.listdir(stacks_dir()) if os.path.isdir(os.path.join(stacks_dir(), d)))
+    except OSError:
+        return []
+
+
+# Today's Maven behaviour; used when stacks/java/stack.yaml has no `ci:` block (or no pack exists at all).
+JAVA_CI_DEFAULT = {"test_glob": r"/src/test/java/.+\.(java|kt)$", "manifest": "pom.xml", "setup": "java"}
+
+
+def load_stack(stack):
+    try:
+        with open(os.path.join(stacks_dir(), stack, "stack.yaml"), encoding="utf-8") as fh:
+            return parse_yaml_subset(fh.read())
+    except OSError:
+        return {}
+
+
+def stack_ci(stack):
+    """`ci:` block of the pack (keys: test_glob, test_cmd, setup, manifest). Java falls back to Maven defaults."""
+    ci = load_stack(stack).get("ci")
+    ci = dict(ci) if isinstance(ci, dict) else {}
+    if stack == "java":
+        for key, value in JAVA_CI_DEFAULT.items():
+            ci.setdefault(key, value)
+    return ci
+
+
+def detect_stack(path):
+    """`projects/<name>/<stack>/...` -> (stack, module dir). A project without a stack segment (legacy layout such as
+    `projects/p1-loan-core-java8/...`, or a manifest `dir` override) implies java; its module is the project dir."""
+    parts = path.replace("\\", "/").split("/")
+    if len(parts) < 3 or parts[0] != "projects":
+        return None
+    if len(parts) > 3 and parts[2] in known_stacks():
+        return parts[2], "/".join(parts[:3])
+    marker = "/src/test/"
+    module = path.split(marker, 1)[0] if marker in path else "/".join(parts[:2])
+    return "java", module
+
+
+def has_manifest(module, manifest):
+    if not manifest:
+        return True
+    pattern = os.path.join(ROOT, module, manifest)
+    if any(c in manifest for c in "*?["):
+        return bool(glob.glob(pattern, recursive=True))
+    return os.path.exists(pattern)
+
+
+def is_test_file(stack, path):
+    """True when `path` is a test source of `stack` (ci.test_glob regex, plus the Java class-name convention)."""
+    glob_re = stack_ci(stack).get("test_glob")
+    if not glob_re or not re.search(glob_re, path):
+        return False
+    if stack == "java":
+        name = os.path.splitext(os.path.basename(path))[0]
+        return bool(re.search(r"(Test|Tests|IT|Properties|Property|Contract.*)$", name))
+    return True
+
+
+def is_prod_file(stack, path):
+    """True when `path` is production source of `stack` (under the pack's `layout.src`). Java keeps `/src/main/`."""
+    if stack == "java":
+        return "/src/main/" in path
+    src = load_stack(stack).get("layout", {}).get("src") if isinstance(load_stack(stack).get("layout"), dict) else None
+    if not src:
+        return False
+    hit = detect_stack(path)
+    if not hit or hit[0] != stack:
+        return False
+    rel = path[len(hit[1]):].lstrip("/")
+    return rel == src or rel.startswith(src.rstrip("/") + "/")
+
+
+def is_session_test_path(path):
+    """Test file of whichever stack owns `path` (Java: anything under `src/test/`, fixtures included)."""
+    hit = detect_stack(path)
+    if not hit:
+        return False
+    if hit[0] == "java":
+        return "/src/test/" in path
+    return is_test_file(hit[0], path)
+
+
+def test_command(stack, module, tests, registered):
+    """argv used to run one module's tests (None when the pack declares no ci.test_cmd). Java keeps exact Maven."""
+    if stack == "java":
+        base_cmd = ["mvn", "-B", "-ntp", "test", f"-Dtest={','.join(tests)}",
+                    "-Dsurefire.failIfNoSpecifiedTests=false", "-DfailIfNoTests=false"]
+        return base_cmd + (["-pl", module, "-am"] if module in registered else ["-f", f"{module}/pom.xml"])
+    template = stack_ci(stack).get("test_cmd")
+    if not template:
+        return None
+    return ["bash", "-lc", template.replace("{dir}", shlex.quote(module))]
+
+
+def stacks_of_paths(paths):
+    found = set()
+    for path in paths:
+        hit = detect_stack(path)
+        if hit:
+            found.add(hit[0])
+    return sorted(found)
+
+
+def configured_stacks(cfg):
+    names = [s.strip() for s in re.split(r"[,\s]+", cfg.get("stacks") or cfg.get("stack") or "java") if s.strip()]
+    return names or ["java"]
+
+
+def setups_for(stacks):
+    out = set()
+    for stack in stacks:
+        setup = stack_ci(stack).get("setup")
+        if setup:
+            out.add(setup)
+    return sorted(out)
+
+
+def load_levels():
+    """Level ladder from progress/rules.json: `global_levels` if present, else `levels`, else the fallback."""
+    rules = read_json(os.path.join(ROOT, "progress", "rules.json"), {})
+    rows = rules.get("global_levels") or rules.get("levels") or []
+    levels = [(r["id"], r["name"], r["min"]) for r in rows if isinstance(r, dict) and {"id", "name", "min"} <= set(r)]
+    return levels or list(FALLBACK_LEVELS)
+
+
+def level_icon(level_id):
+    return LEVEL_ICONS.get(level_id, "🎓")
+
+
+def level_key(level_id):
+    digits = re.sub(r"\D", "", level_id or "")
+    return int(digits) if digits else 0
+
+
+def achievement_definitions():
+    """Union of progress/achievements.json and stacks/*/achievements.json definitions; one entry per (id, stack)."""
+    seen, defs = set(), []
+    sources = [read_json(os.path.join(ROOT, "progress", "achievements.json"), {})]
+    for stack in known_stacks():
+        sources.append(read_json(os.path.join(stacks_dir(), stack, "achievements.json"), {}))
+    for source in sources:
+        for d in source.get("definitions", []):
+            key = (d.get("id"), d.get("stack"))
+            if d.get("id") and key not in seen:
+                seen.add(key)
+                defs.append(d)
+    return defs
+
+
+def stacks_in_play(cfg=None):
+    """Distinct `stack` values of progress/sessions/*.json; else the configured stacks; else java."""
+    found = set()
+    for path in glob.glob(os.path.join(ROOT, "progress", "sessions", "*.json")):
+        stack = read_json(path, {}).get("stack")
+        if stack:
+            found.add(stack)
+    return sorted(found) if found else configured_stacks(cfg or load_config())
+
+
+def achievements_total(defs, play):
+    """common + polyglot + per-stack x |play| + stack-scope definitions of the stacks in play. Never hard-coded."""
+    def count(name):
+        return sum(1 for d in defs if d.get("scope", "common") == name)
+    stack_defs = sum(1 for d in defs if d.get("scope") == "stack" and d.get("stack") in play)
+    return count("common") + count("polyglot") + count("per-stack") * len(play) + stack_defs
 
 
 def tail(text, lines=40):
@@ -142,6 +391,9 @@ def cmd_config(_args):
     set_output("day", day)
     set_output("day_padded", f"{day:02d}")
     set_output("project", profile.get("current_project", ""))
+    stacks = configured_stacks(cfg)
+    set_output("stacks_list", ",".join(stacks))
+    set_output("stacks_json", json.dumps(stacks))
 
 
 # --------------------------------------------------------------------------- session tests
@@ -161,10 +413,46 @@ def resolve_base(cli_base, head):
 
 
 def module_of(test_path):
-    marker = "/src/test/"
-    if marker not in test_path:
-        return None
-    return test_path.split(marker, 1)[0]
+    hit = detect_stack(test_path)
+    return hit[1] if hit else None
+
+
+def cmd_changed_projects(args):
+    """Project folders whose production code changed between --base and --head (any stack)."""
+    changed = git("diff", "--name-only", args.base, args.head, "--", "projects").stdout.split()
+    folders = set()
+    for path in changed:
+        hit = detect_stack(path)
+        if hit and is_prod_file(hit[0], path):
+            folders.add(path.split("/")[1])
+    value = ",".join(sorted(folders))
+    set_output("projects", value)
+    print(value)
+
+
+def cmd_filter_tests(_args):
+    """Reads paths on stdin, prints those that are test files of their stack (used to stage test skeletons)."""
+    for line in sys.stdin.read().splitlines():
+        path = line.strip()
+        if path and is_session_test_path(path):
+            print(path)
+
+
+def cmd_detect_stacks(args):
+    """Stacks touched by the session diff (same base resolution as session-tests); configured `stacks` otherwise."""
+    cfg = load_config()
+    head = args.head or "HEAD"
+    base, reason = (None, "config-only") if args.config_only else resolve_base(args.base, head)
+    changed = git("diff", "--name-only", "--diff-filter=AMR", base, head).stdout.split() if base else []
+    stacks = stacks_of_paths(p for p in changed if p.startswith("projects/"))
+    source = "diff"
+    if not stacks:
+        stacks, source = configured_stacks(cfg), "config"
+    setups = setups_for(stacks)
+    set_output("stacks", ",".join(stacks))
+    set_output("setups", ",".join(setups))
+    set_output("stacks_source", source)
+    print(json.dumps({"stacks": stacks, "setups": setups, "source": source, "base": base, "base_reason": reason}))
 
 
 def cmd_session_tests(args):
@@ -176,26 +464,30 @@ def cmd_session_tests(args):
     else:
         changed = git("ls-files", "projects").stdout.split()
 
-    modules = {}
+    modules, module_stack = {}, {}
     for path in changed:
-        if not path.startswith("projects/") or not re.search(r"/src/test/java/.+\.(java|kt)$", path):
+        if not path.startswith("projects/"):
             continue
+        hit = detect_stack(path)
+        if not hit or not is_test_file(hit[0], path):
+            continue
+        stack, module = hit
         name = os.path.splitext(os.path.basename(path))[0]
-        if not re.search(r"(Test|Tests|IT|Properties|Property|Contract.*)$", name):
-            continue
-        module = module_of(path)
-        if module and os.path.exists(os.path.join(module, "pom.xml")):
+        if has_manifest(module, stack_ci(stack).get("manifest")):
             modules.setdefault(module, set()).add(name)
+            module_stack[module] = stack
 
     result = {
         "base": base, "base_reason": reason, "head": head,
         "modules": {m: sorted(t) for m, t in sorted(modules.items())},
+        "stacks": {m: module_stack[m] for m in sorted(modules)},
         "projects": sorted({m.split("/")[1] for m in modules}),
     }
     write_json(os.path.join(OUT, "session-tests.json"), result)
     set_output("has_tests", "true" if modules else "false")
     set_output("base", base or "")
     set_output("projects", ",".join(result["projects"]))
+    set_output("stacks", ",".join(sorted(set(module_stack.values()))))
     print(json.dumps(result, indent=2))
 
 
@@ -233,22 +525,38 @@ def parse_surefire(module):
     return cases
 
 
+def exit_code_cases(tests, proc):
+    """Non-Java stacks have no surefire XML: derive one synthetic case per selected test file from the exit code.
+    A non-zero exit whose output mentions `LEARNER` is the expected locked skeleton; any other failure yields no
+    cases, so the module is reported as a build error (a real failure)."""
+    if proc.returncode == 0:
+        status, message = "passed", ""
+    elif "LEARNER" in (proc.stdout or "") + (proc.stderr or ""):
+        status, message = "locked", "LEARNER"
+    else:
+        return []
+    return [{"class": t, "name": "(module run)", "status": status, "message": message} for t in tests]
+
+
 def cmd_run_tests(_args):
     plan = read_json(os.path.join(OUT, "session-tests.json"), {"modules": {}})
     registered = registered_modules()
     results = {"modules": [], "totals": {"passed": 0, "locked": 0, "failed": 0, "skipped": 0, "build_errors": 0}}
 
     for module, tests in plan.get("modules", {}).items():
-        selector = ",".join(tests)
-        base_cmd = ["mvn", "-B", "-ntp", "test", f"-Dtest={selector}",
-                    "-Dsurefire.failIfNoSpecifiedTests=false", "-DfailIfNoTests=false"]
-        cmd = base_cmd + (["-pl", module, "-am"] if module in registered else ["-f", f"{module}/pom.xml"])
+        stack = plan.get("stacks", {}).get(module) or (detect_stack(module + "/x") or ("java",))[0]
+        cmd = test_command(stack, module, tests, registered)
+        if cmd is None:
+            results["modules"].append({"module": module, "tests": tests, "exit_code": None, "cases": [],
+                                       "build_error": True, "log_tail": f"stacks/{stack}/stack.yaml has no ci.test_cmd"})
+            results["totals"]["build_errors"] += 1
+            continue
         print("::group::" + " ".join(cmd))
         proc = subprocess.run(cmd, capture_output=True, text=True)
         print(tail(proc.stdout, 200))
         print("::endgroup::")
 
-        cases = parse_surefire(module)
+        cases = parse_surefire(module) if stack == "java" else exit_code_cases(tests, proc)
         build_error = proc.returncode != 0 and not cases
         entry = {"module": module, "tests": tests, "exit_code": proc.returncode, "cases": cases,
                  "build_error": build_error, "log_tail": tail(proc.stdout + proc.stderr) if build_error else ""}
@@ -512,7 +820,7 @@ def bar(value, total, width=20):
 def render_dashboard(title):
     cfg = load_config()
     profile = read_json(PROFILE_FILE, {})
-    achievements = read_json(ACHIEVEMENTS_FILE, {"definitions": [], "unlocked": []})
+    achievements = read_json(ACHIEVEMENTS_FILE, {"unlocked": []})
     feed = read_json(FEED_FILE, {})
     tests = read_json(os.path.join(OUT, "test-results.json"), None)
     verification = read_json(os.path.join(OUT, "verification.json"), None)
@@ -524,11 +832,12 @@ def render_dashboard(title):
     xp_total = profile.get("xp_total", 0)
     in_level = level.get("xp_in_level", 0)
     to_next = level.get("xp_to_next", 0)
-    next_name = next((name for lid, name, _ in LEVELS if lid > level_id), None)
+    levels = load_levels()
+    next_name = next((name for lid, name, _ in levels if level_key(lid) > level_key(level_id)), None)
     day = profile.get("current_day", 1)
 
     md = [f"## {title}", ""]
-    md.append(f"### {LEVEL_ICONS.get(level_id, '🎓')} {level.get('name', 'Apprentice')} · Day {day}/30 · "
+    md.append(f"### {level_icon(level_id)} {level.get('name', 'Apprentice')} · Day {day}/30 · "
               f"`{profile.get('current_project', '—')}`")
     md.append("")
     md.append("```text")
@@ -552,18 +861,20 @@ def render_dashboard(title):
     md.append("<details><summary>🪜 Level ladder</summary>\n")
     md.append("| | Level | From XP |")
     md.append("|---|---|---|")
-    for lid, name, floor in LEVELS:
-        marker = "👉" if lid == level_id else ("✅" if lid < level_id else "")
-        md.append(f"| {marker} | {LEVEL_ICONS[lid]} {name} | {floor} |")
+    for lid, name, floor in levels:
+        marker = "👉" if lid == level_id else ("✅" if level_key(lid) < level_key(level_id) else "")
+        md.append(f"| {marker} | {level_icon(lid)} {name} | {floor} |")
     md.append("\n</details>\n")
 
-    unlocked = {u["id"]: u for u in achievements.get("unlocked", [])}
-    definitions = achievements.get("definitions", [])
-    md.append(f"### 🏆 Achievements {len(unlocked)}/{len(definitions)}")
+    unlocked = {u["id"] for u in achievements.get("unlocked", [])}
+    play = stacks_in_play(cfg)
+    all_defs = achievement_definitions()
+    definitions = [d for d in all_defs if d.get("scope", "common") != "stack" or d.get("stack") in play]
+    md.append(f"### 🏆 Achievements {len(unlocked)}/{achievements_total(all_defs, play)}")
     md.append("")
     cells = []
     for d in definitions:
-        if d["id"] in unlocked:
+        if d["id"] in unlocked or any(u.startswith(d["id"] + "@") for u in unlocked):
             cells.append(f"🏆 **{d['name']}**<br><sub>+{d['xp']} XP · {d['description']}</sub>")
         else:
             cells.append(f"🔒 {d['name']}<br><sub>{d['xp']} XP · {d['description']}</sub>")
@@ -693,6 +1004,16 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("config").set_defaults(func=cmd_config)
     sub.add_parser("snapshot").set_defaults(func=cmd_snapshot)
+    p = sub.add_parser("detect-stacks")
+    p.add_argument("--base", default="")
+    p.add_argument("--head", default="HEAD")
+    p.add_argument("--config-only", action="store_true")
+    p.set_defaults(func=cmd_detect_stacks)
+    p = sub.add_parser("changed-projects")
+    p.add_argument("--base", required=True)
+    p.add_argument("--head", default="HEAD")
+    p.set_defaults(func=cmd_changed_projects)
+    sub.add_parser("filter-tests").set_defaults(func=cmd_filter_tests)
     p = sub.add_parser("session-tests")
     p.add_argument("--base", default="")
     p.add_argument("--head", default="HEAD")

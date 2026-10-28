@@ -1,0 +1,56 @@
+{
+  "schema_version": 2,
+  "stack": "java",
+  "definitions": [
+    {
+      "id": "hello-21",
+      "name": "Hello, 21",
+      "tier": "domain-core",
+      "xp": 50,
+      "scope": "stack",
+      "stack": "java",
+      "description": "First record + sealed interface in P2.",
+      "criteria": "grep -rE 'sealed (interface|class)' projects/p2-loan-core-modern/src/main/java has >=1 match AND day-06 verification all_passed"
+    },
+    {
+      "id": "sealed-fate",
+      "name": "Sealed Fate",
+      "tier": "domain-core",
+      "xp": 75,
+      "scope": "stack",
+      "stack": "java",
+      "description": "Model a domain union with a non-trivial sealed hierarchy (>=3 permits).",
+      "criteria": "any sealed interface or class in projects/p[2-9]-*/src/main/java has >=3 permitted types"
+    },
+    {
+      "id": "pattern-master",
+      "name": "Pattern Master",
+      "tier": "domain-core",
+      "xp": 75,
+      "scope": "stack",
+      "stack": "java",
+      "description": "Replace 5+ instanceof chains with pattern switches.",
+      "criteria": "grep -rE 'switch (.+) {' projects/p[2-9]-*/src/main/java with case-of pattern arms >=5 across project"
+    },
+    {
+      "id": "loom-lord",
+      "name": "Loom Lord",
+      "tier": "cloud-infra",
+      "xp": 100,
+      "scope": "stack",
+      "stack": "java",
+      "description": "Measurable throughput win from virtual threads, charted.",
+      "criteria": "p8 contains a benchmark report showing >2x throughput on virtual vs platform threads"
+    },
+    {
+      "id": "the-quarkus-question",
+      "name": "The Quarkus Question",
+      "tier": "hexagonal",
+      "xp": 100,
+      "scope": "stack",
+      "stack": "java",
+      "description": "Complete 3+ Quarkus side quests and write a comparison ADR.",
+      "criteria": ">=3 of SQ-01..SQ-04 marked done AND curriculum/adr/ contains a quarkus comparison ADR"
+    }
+  ]
+}

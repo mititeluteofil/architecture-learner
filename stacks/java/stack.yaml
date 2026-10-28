@@ -1,0 +1,48 @@
+id: java
+name: Java
+language: Java
+steps:
+  baseline:
+    version: "Java 8"
+    spotlight: "Plain classes, final fields, Optional, streams; no var, records or sealed types"
+  modern:
+    version: "Java 21"
+    spotlight: "Records, sealed interfaces, pattern-matching switch, var"
+frameworks:
+  default: spring-boot
+  spring-boot: "Spring Boot 3.3.x (Jakarta namespace)"
+  quarkus: "Quarkus 3 (variant)"
+marker:
+  comment: '// LEARNER: <hint>'
+  config_comment: '# LEARNER: <hint>'
+  stub_throw: 'throw new UnsupportedOperationException("LEARNER: implement - <hint>");'
+  failing_test: 'fail("LEARNER: <hint>");'
+layout:
+  manifest: pom.xml
+  src: src/main/java
+  tests: src/test/java
+  project_dir: "projects/p<N>-<slug>/java/"
+  legacy_dir: "projects/p1-loan-core-java8 (declared as a dir override in the masterplan)"
+  registration: "Add the module to the root pom.xml modules list"
+tooling:
+  test: "JUnit 5 + AssertJ"
+  property: jqwik
+  arch: ArchUnit
+  mutation: PIT
+  contract: "Pact (Spring Cloud Contract allowed, JVM only)"
+  migrations: Flyway
+  kafka: spring-kafka
+  otel: "OpenTelemetry Java agent / Micrometer"
+  image: "Jib (Maven plugin); plain Dockerfile only for sidecars"
+decimal_type: java.math.BigDecimal
+# Keys read by achievement criteria (progress/achievements.json) and the CI planner.
+property_lib: jqwik
+# regex over the P3 PLAN.md/domain source; {core_aggregate} comes from the masterplan manifest
+aggregate_marker: '(final )?class {core_aggregate}([^A-Za-z0-9_]|$)'
+# HEURISTIC threshold, not a measurement: tune after the first real image build (see verify.yaml image-size)
+image_size_max_mb: 250
+ci:
+  test_glob: 'projects/.+/src/test/java/.+\.java$'
+  test_cmd: './mvnw -pl {dir} -am test'
+  setup: java
+  manifest: 'pom.xml'

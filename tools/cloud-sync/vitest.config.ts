@@ -19,6 +19,8 @@ export default defineConfig({
     }),
   ],
   test: {
+    // scripts/*.test.mjs are node:test files (run by `node --test` in CI), not workerd tests.
+    include: ["test/**/*.test.ts"],
     setupFiles: ["./test/apply-schema.ts"],
   },
 });

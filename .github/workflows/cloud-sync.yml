@@ -5,11 +5,39 @@ on:
     paths:
       - 'tools/cloud-sync/**'
       - 'progress/rules.json'
+      - 'progress/achievements.json'
+      - 'stacks/*/achievements.json'
+      - 'tools/gamification-ref/**'
+      - 'tools/masterplan-lint/**'
+      - 'tools/sync-agents/**'
+      - '.claude/**'
+      - '.junie/**'
+      - 'curriculum/masterplan*.yaml'
+      - 'curriculum/masterplans/**'
+      - 'curriculum/spine.yaml'
+      - 'curriculum/day-by-day/**'
+      - 'stacks/**'
+      - '.github/scripts/**'
+      - '.github/actions/**'
       - '.github/workflows/cloud-sync.yml'
   pull_request:
     paths:
       - 'tools/cloud-sync/**'
       - 'progress/rules.json'
+      - 'progress/achievements.json'
+      - 'stacks/*/achievements.json'
+      - 'tools/gamification-ref/**'
+      - 'tools/masterplan-lint/**'
+      - 'tools/sync-agents/**'
+      - '.claude/**'
+      - '.junie/**'
+      - 'curriculum/masterplan*.yaml'
+      - 'curriculum/masterplans/**'
+      - 'curriculum/spine.yaml'
+      - 'curriculum/day-by-day/**'
+      - 'stacks/**'
+      - '.github/scripts/**'
+      - '.github/actions/**'
       - '.github/workflows/cloud-sync.yml'
   workflow_dispatch:
 
@@ -46,3 +74,34 @@ jobs:
 
       # /sync payload builder (zero-dep, node:test).
       - run: node --test "scripts/*.test.mjs"
+
+      # Level/title spec oracle for award-xp (zero-dep, node:test); run from the repo root.
+      - run: node --test "tools/gamification-ref/*.test.mjs"
+        working-directory: .
+
+  # Repo-level guards (no npm install needed: zero-dependency tools).
+  repo-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Masterplan/spine/day-file/vector linter: errors fail, warnings (lazily created day files) do not.
+      - run: node --test
+        working-directory: tools/masterplan-lint
+      - run: node tools/masterplan-lint/lint.mjs
+
+      # .claude is the source of truth; .junie is generated. Drift fails CI (fix: node tools/sync-agents/sync.mjs).
+      - run: node --test
+        working-directory: tools/sync-agents
+      - run: node tools/sync-agents/sync.mjs --check
+
+      # learning_loop.py stack dispatch (stdlib only).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest
+        working-directory: .github/scripts

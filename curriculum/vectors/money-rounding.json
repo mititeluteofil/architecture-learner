@@ -1,0 +1,127 @@
+{
+  "name": "money-rounding",
+  "description": "Decimal rounding to a scale under a named mode; inputs and expected are decimal strings.",
+  "version": 1,
+  "cases": [
+    {
+      "id": "half-up-1",
+      "op": "round",
+      "mode": "HALF_UP",
+      "scale": 2,
+      "input": "2.345",
+      "expected": "2.35"
+    },
+    {
+      "id": "half-up-2",
+      "op": "round",
+      "mode": "HALF_UP",
+      "scale": 2,
+      "input": "2.344",
+      "expected": "2.34"
+    },
+    {
+      "id": "half-up-3",
+      "op": "round",
+      "mode": "HALF_UP",
+      "scale": 2,
+      "input": "2.355",
+      "expected": "2.36"
+    },
+    {
+      "id": "half-up-4",
+      "op": "round",
+      "mode": "HALF_UP",
+      "scale": 2,
+      "input": "-2.345",
+      "expected": "-2.35"
+    },
+    {
+      "id": "half-up-5",
+      "op": "round",
+      "mode": "HALF_UP",
+      "scale": 2,
+      "input": "0.005",
+      "expected": "0.01"
+    },
+    {
+      "id": "half-even-6",
+      "op": "round",
+      "mode": "HALF_EVEN",
+      "scale": 2,
+      "input": "2.345",
+      "expected": "2.34"
+    },
+    {
+      "id": "half-even-7",
+      "op": "round",
+      "mode": "HALF_EVEN",
+      "scale": 2,
+      "input": "2.355",
+      "expected": "2.36"
+    },
+    {
+      "id": "half-even-8",
+      "op": "round",
+      "mode": "HALF_EVEN",
+      "scale": 0,
+      "input": "2.5",
+      "expected": "2"
+    },
+    {
+      "id": "half-even-9",
+      "op": "round",
+      "mode": "HALF_EVEN",
+      "scale": 0,
+      "input": "3.5",
+      "expected": "4"
+    },
+    {
+      "id": "half-even-10",
+      "op": "round",
+      "mode": "HALF_EVEN",
+      "scale": 2,
+      "input": "2.346",
+      "expected": "2.35"
+    },
+    {
+      "id": "down-11",
+      "op": "round",
+      "mode": "DOWN",
+      "scale": 2,
+      "input": "2.349",
+      "expected": "2.34"
+    },
+    {
+      "id": "down-12",
+      "op": "round",
+      "mode": "DOWN",
+      "scale": 2,
+      "input": "2.999",
+      "expected": "2.99"
+    },
+    {
+      "id": "down-13",
+      "op": "round",
+      "mode": "DOWN",
+      "scale": 2,
+      "input": "-2.349",
+      "expected": "-2.34"
+    },
+    {
+      "id": "down-14",
+      "op": "round",
+      "mode": "DOWN",
+      "scale": 0,
+      "input": "1.5",
+      "expected": "1"
+    },
+    {
+      "id": "down-15",
+      "op": "round",
+      "mode": "DOWN",
+      "scale": 2,
+      "input": "10.000",
+      "expected": "10.00"
+    }
+  ]
+}

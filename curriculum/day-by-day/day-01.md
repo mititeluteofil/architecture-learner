@@ -33,10 +33,10 @@ Write the ADRs as 5-minute documents. They don't have to be right; they have to 
 
 ## Verification
 
-- [ ] `./mvnw -pl projects/p1-loan-core-java8 -am verify`
-- [ ] `grep -rE 'var |record |sealed ' projects/p1-loan-core-java8/src/main/java | wc -l` returns `0` (Java 8 discipline)
-- [ ] `curriculum/adr/0001-money-currency-mismatch.md` exists (even a stub)
-- [ ] `git diff --stat HEAD~1 HEAD` shows at least 5 files changed
+- [ ] verify: build p1
+- [ ] verify: discipline p1 baseline
+- [ ] `test -f curriculum/adr/0001-money-currency-mismatch.md` (even a stub)
+- [ ] `test "$(git diff --name-only HEAD~1 HEAD | wc -l)" -ge 5` (at least 5 files changed)
 
 ## Buddy prompts
 

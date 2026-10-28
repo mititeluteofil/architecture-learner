@@ -1,0 +1,46 @@
+{
+  "schema_version": 2,
+  "stack": "node",
+  "definitions": [
+    {
+      "id": "strictly-typed",
+      "name": "Strictly Typed",
+      "tier": "domain-core",
+      "xp": 50,
+      "scope": "stack",
+      "stack": "node",
+      "description": "tsc strict with noUncheckedIndexedAccess is clean from P2 on.",
+      "criteria": "`tsc --noEmit --strict --noUncheckedIndexedAccess` exits 0 in every node project p[2-9]-*"
+    },
+    {
+      "id": "union-jack",
+      "name": "Union Jack",
+      "tier": "domain-core",
+      "xp": 75,
+      "scope": "stack",
+      "stack": "node",
+      "description": "Discriminated union with an exhaustive never check (>=3 arms).",
+      "criteria": "a node domain source file has a discriminated union with >=3 variants AND a `: never` exhaustiveness assignment in its switch default, and `tsc --noEmit` exits 0"
+    },
+    {
+      "id": "no-floating-money",
+      "name": "No Floating Money",
+      "tier": "domain-core",
+      "xp": 50,
+      "scope": "stack",
+      "stack": "node",
+      "description": "P1 money vectors green with no number arithmetic on amounts.",
+      "criteria": "`verify: vectors p1 money-rounding` exits 0 for node AND no `number`-typed amount field or arithmetic on amounts in the P1 domain (grep for Money amount typed number returns 0 matches)"
+    },
+    {
+      "id": "loop-whisperer",
+      "name": "Loop Whisperer",
+      "tier": "cloud-infra",
+      "xp": 100,
+      "scope": "stack",
+      "stack": "node",
+      "description": "CPU-bound use case offloaded to a worker thread, benchmark committed.",
+      "criteria": "a node project uses node:worker_threads for a CPU-bound use case AND a benchmark report file comparing before/after is committed under that project"
+    }
+  ]
+}

@@ -83,3 +83,78 @@ describe("rules.json drift", () => {
     expect(computeStreak(run.slice(0, every)).streak_shields).toBe(1);
   });
 });
+
+// ---- v2: stack ladders / global ladder / titles, and drift against the spec oracle ----
+import { GLOBAL_LEVELS, computeGlobalLevel, computeStacksAndTitles, type LedgerSession } from "../src/rules";
+import { computeState } from "../../gamification-ref/compute.mjs";
+
+const led = (session_no: number, stack: string, xp: number, extra: Partial<LedgerSession> = {}): LedgerSession => ({
+  session_no,
+  stack,
+  mode: "hands-on",
+  run: 1,
+  xp_earned: xp,
+  ...extra,
+});
+
+describe("global ladder", () => {
+  it("worker table equals rules.json global_levels and covers L1-L9", () => {
+    expect(GLOBAL_LEVELS).toEqual(rules.global_levels);
+    expect(computeGlobalLevel(15_000).id).toBe("L6");
+    expect(computeGlobalLevel(15_001)).toMatchObject({ id: "L7", name: "Principal", xp_in_level: 0 });
+    expect(computeGlobalLevel(40_001)).toMatchObject({ id: "L9", name: "Fellow", xp_to_next: 0 });
+  });
+});
+
+describe("computeStacksAndTitles", () => {
+  it("session-01-like ledger row gives Java L1 Apprentice", () => {
+    const r = computeStacksAndTitles([led(1, "java", 175)]);
+    expect(r.stacks.java.level.id).toBe("L1");
+    expect(r.titles.headline).toBe("Apprentice · Java");
+    expect(r.global_level.id).toBe("L1");
+  });
+
+  it("Java L4 + Python L2 + Ruby L2 gives Trilingual Journeyman and Senior · Java", () => {
+    const r = computeStacksAndTitles([led(1, "java", 3300), led(2, "python", 700), led(3, "ruby", 650)]);
+    expect(r.titles.headline).toBe("Trilingual Journeyman");
+    expect(r.titles.best_single).toBe("Senior · Java");
+  });
+
+  it("matches the spec oracle on every fixture", () => {
+    const fixtures: LedgerSession[][] = [
+      [led(1, "java", 175)],
+      [led(1, "java", 700), led(2, "python", 800)],
+      [led(1, "java", 3300), led(2, "python", 700), led(3, "ruby", 650)],
+      [led(1, "java", 3300), led(2, "ruby", 5000, { mode: "assisted" }), led(3, "python", 700)],
+      [led(1, "java", 5000), led(1, "java", 700, { run: 2 }), led(2, "python", 700, { run: 2 })],
+      [
+        led(1, "java", 650, {
+          session_json: JSON.stringify({ achievements_unlocked: [{ id: "decision-anchor", scope: "common", xp: 50 }] }),
+        }),
+      ],
+      ["java", "dotnet", "node", "python", "ruby"].map((k, i) => led(i + 1, k, 700)),
+    ];
+    for (const rows of fixtures) {
+      const oracleIn = rows.map((r, i) => ({
+        session: i + 1,
+        xp_earned: r.xp_earned,
+        stack: r.stack,
+        mode: r.mode,
+        run: r.run,
+        achievements_unlocked: r.session_json ? JSON.parse(r.session_json).achievements_unlocked : undefined,
+      }));
+      const want = computeState(oracleIn, rules);
+      const got = computeStacksAndTitles(rows);
+      expect(got.titles).toEqual(want.titles);
+      expect(got.global_level).toEqual(want.global_level);
+      const wantStacks = Object.fromEntries(Object.entries(want.stacks).map(([k, v]: [string, any]) => [k, { xp: v.xp, level: v.level, mode: v.mode }]));
+      expect(got.stacks).toEqual(wantStacks);
+      expect([got.run, got.prestige, got.xp_total, got.lifetime_xp]).toEqual([
+        want.run,
+        want.prestige,
+        want.xp_total,
+        want.lifetime_xp,
+      ]);
+    }
+  });
+});

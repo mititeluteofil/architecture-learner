@@ -1,0 +1,18 @@
+# abstract verb -> command template; {dir} = project directory
+build: dotnet test {dir} --nologo
+discipline.baseline: test "$(grep -rEw 'record|init|is not null' --include=*.cs {dir}/src | wc -l)" -eq 0
+discipline.modern: grep -rEwq 'record' --include=*.cs {dir}/src
+vectors: dotnet test {dir} --nologo --filter 'FullyQualifiedName~Vector'
+arch: dotnet test {dir} --nologo --filter 'FullyQualifiedName~Architecture'
+property: dotnet test {dir} --nologo --filter 'FullyQualifiedName~Property'
+contract: dotnet test {dir} --nologo --filter 'FullyQualifiedName~Pact'
+image: dotnet publish {dir}/src -c Release /t:PublishContainer
+# --- Wave 4A additions. All are best-effort heuristics, UNPROVEN until a project of this stack exists. ---
+# test/day: plain test run; `day` backs `verify: day p1-end` (day-end checklist == the slot's build).
+test: dotnet test {dir} --nologo
+day: dotnet test {dir} --nologo
+# idempotency/chaos rely on a test-naming (or tag) convention the learner's tests must follow.
+idempotency: dotnet test {dir} --nologo --filter 'FullyQualifiedName~Idempoten'
+chaos: dotnet test {dir} --nologo --filter 'FullyQualifiedName~Chaos|FullyQualifiedName~Rollback'
+# image-size assumes the image is tagged loan-service (the image verb tags it for docker-based stacks; jib/dotnet need an image-name setting).
+image-size: test "$(docker image inspect loan-service --format '{{.Size}}')" -le "$(( {image_size_max_mb} * 1024 * 1024 ))"

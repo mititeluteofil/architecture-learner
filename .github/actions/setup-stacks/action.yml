@@ -1,0 +1,35 @@
+name: Setup stack toolchains
+description: >
+  Installs the toolchains for the stacks present in a diff. `setups` is the comma list produced by
+  `learning_loop.py detect-stacks` (values: java, dotnet, node, python, ruby). Java is set up inline by the
+  workflow (cache: maven), so it is not handled here.
+inputs:
+  setups:
+    description: Comma list of toolchains to install (java, dotnet, node, python, ruby).
+    required: true
+runs:
+  using: composite
+  steps:
+    - if: ${{ contains(format(',{0},', inputs.setups), ',dotnet,') }}
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: "8.0.x"
+
+    - if: ${{ contains(format(',{0},', inputs.setups), ',node,') }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+
+    - if: ${{ contains(format(',{0},', inputs.setups), ',python,') }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - if: ${{ contains(format(',{0},', inputs.setups), ',python,') }}
+      uses: astral-sh/setup-uv@v5
+
+    - if: ${{ contains(format(',{0},', inputs.setups), ',ruby,') }}
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: "3.3"
+        bundler-cache: false

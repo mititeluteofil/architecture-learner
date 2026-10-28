@@ -1,0 +1,47 @@
+id: ruby
+name: Ruby
+language: Ruby
+steps:
+  baseline:
+    version: "Ruby 2.7"
+    spotlight: "Plain classes and modules, duck typing; no pattern matching, no Data, no RBS"
+  modern:
+    version: "Ruby 3.3"
+    spotlight: "Pattern matching (case/in), Data.define value objects, RBS signatures"
+frameworks:
+  default: rails-api
+  rails-api: "Rails 7.1 API mode (friction with hexagonal is a comparison lesson)"
+  hanami: "Hanami 2 (variant)"
+marker:
+  comment: '# LEARNER: <hint>'
+  config_comment: '# LEARNER: <hint>'
+  stub_throw: 'raise NotImplementedError, "LEARNER: implement - <hint>"'
+  failing_test: 'flunk "LEARNER: <hint>"'
+layout:
+  manifest: Gemfile
+  src: lib
+  tests: spec
+  project_dir: "projects/p<N>-<slug>/ruby/"
+  registration: "Each project owns its Gemfile; no root registration"
+tooling:
+  test: RSpec
+  property: prop_check
+  arch: Packwerk
+  mutation: mutant
+  contract: pact-ruby
+  migrations: "Sequel or ActiveRecord migrations replaying the shared SQL"
+  kafka: karafka
+  otel: opentelemetry-sdk
+  image: "Multi-stage Dockerfile on a slim base; plain Dockerfile only for sidecars"
+decimal_type: BigDecimal
+# Keys read by achievement criteria (progress/achievements.json) and the CI planner.
+property_lib: prop_check
+# regex over the P3 PLAN.md/domain source; {core_aggregate} comes from the masterplan manifest
+aggregate_marker: 'class {core_aggregate}([^A-Za-z0-9_]|$)'
+# HEURISTIC threshold, not a measurement: tune after the first real image build (see verify.yaml image-size)
+image_size_max_mb: 300
+ci:
+  test_glob: 'projects/.+/spec/.+_spec\.rb$'
+  test_cmd: 'cd {dir} && bundle exec rspec'
+  setup: ruby
+  manifest: 'Gemfile'

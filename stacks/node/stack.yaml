@@ -1,0 +1,47 @@
+id: node
+name: Node
+language: JavaScript/TypeScript
+steps:
+  baseline:
+    version: "ES2017 JavaScript (CommonJS)"
+    spotlight: "Plain classes and functions, Object.freeze for value objects; no TypeScript, no ES modules"
+  modern:
+    version: "TypeScript 5 (strict)"
+    spotlight: "Discriminated unions, readonly types, branded types, exhaustive switch with never"
+frameworks:
+  default: fastify
+  fastify: "Fastify 4"
+  nestjs: "NestJS 10 (variant)"
+marker:
+  comment: '// LEARNER: <hint>'
+  config_comment: '# LEARNER: <hint>'
+  stub_throw: 'throw new Error("LEARNER: implement - <hint>");'
+  failing_test: 'assert.fail("LEARNER: <hint>");'
+layout:
+  manifest: package.json
+  src: src
+  tests: test
+  project_dir: "projects/p<N>-<slug>/node/"
+  registration: "Add the package to root package.json workspaces if one exists"
+tooling:
+  test: "node:test (Vitest for TypeScript) + node:assert"
+  property: fast-check
+  arch: dependency-cruiser
+  mutation: StrykerJS
+  contract: pact-js
+  migrations: "node-pg-migrate or a plain SQL runner over the shared SQL"
+  kafka: kafkajs
+  otel: "@opentelemetry/sdk-node"
+  image: "Multi-stage Dockerfile on a slim or distroless Node base"
+decimal_type: "decimal.js or big.js (never the number type)"
+# Keys read by achievement criteria (progress/achievements.json) and the CI planner.
+property_lib: fast-check
+# regex over the P3 PLAN.md/domain source; {core_aggregate} comes from the masterplan manifest
+aggregate_marker: '(class|interface|type) {core_aggregate}([^A-Za-z0-9_]|$)'
+# HEURISTIC threshold, not a measurement: tune after the first real image build (see verify.yaml image-size)
+image_size_max_mb: 200
+ci:
+  test_glob: 'projects/.+/test/.+\.(js|ts|mjs|cjs)$'
+  test_cmd: 'npm --prefix {dir} ci && npm --prefix {dir} test'
+  setup: node
+  manifest: 'package.json'

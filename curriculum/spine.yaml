@@ -1,0 +1,13 @@
+# Architecture spine: fixed, domain-free and stack-free. A masterplan maps each slot to domain content.
+# YAML subset: block maps, block lists, flow { } / [ ] values, # comments. See tools/masterplan-lint.
+slots:
+  - { id: p1, concept: pure-domain-model, language_step: baseline, days: [1, 3], teaches: [value-objects, immutability, money-and-time, no-framework-core] }
+  - { id: p2, concept: modern-language, language_step: modern, days: [4, 6], teaches: [records-and-data-types, sum-types, pattern-matching, refactor-under-tests] }
+  - { id: p3, concept: hexagonal, days: [7, 10], teaches: [aggregates, ports-and-adapters, architecture-tests, property-tests] }
+  - { id: p4, concept: driving-adapter, days: [11, 13], teaches: [http-adapter, api-contract-first, error-mapping] }
+  - { id: p5, concept: persistence-outbox, days: [14, 16], teaches: [driven-adapter, migrations, transactional-outbox] }
+  - { id: p6, concept: second-service-saga, days: [17, 19], teaches: [bounded-context-split, messaging, saga, consumer-driven-contracts] }
+  - { id: p7, concept: containers-observability, days: [20, 22], teaches: [container-images, compose, metrics-logs-traces] }
+  - { id: p8, concept: kubernetes, days: [23, 25], teaches: [local-cluster, packaging-manifests, autoscaling, concurrency-model] }
+  - { id: p9, concept: cloud, days: [26, 29], teaches: [infrastructure-as-code, local-cloud-emulation, ci-cd, first-real-deploy] }
+  - { id: capstone, concept: chaos, days: [30, 30], teaches: [failure-drills, decision-record-set] }
