@@ -22,12 +22,15 @@ CI = {
              "  setup: ruby\n  manifest: Gemfile"),
 }
 
+SRC = {"java": "src/main/java", "python": "src", "node": "src", "dotnet": "src", "ruby": "lib"}
+
 STACK_YAML = """id: {id}
 name: {id}
 marker:
   comment: '# LEARNER: <hint>'   # a comment after a value
 layout:
   manifest: x
+  src: {src}
 ci:
   {ci}
 tooling:
@@ -50,7 +53,7 @@ class Fixture(unittest.TestCase):
         self._old_root = ll.ROOT
         ll.ROOT = self.root
         for stack, ci in CI.items():
-            body = STACK_YAML.format(id=stack, ci=ci) if self.with_ci else STACK_YAML.split("ci:")[0] + "tooling:\n  test: x\n"
+            body = STACK_YAML.format(id=stack, ci=ci, src=SRC[stack]) if self.with_ci else STACK_YAML.split("ci:")[0] + "tooling:\n  test: x\n"
             write(self.root, f"stacks/{stack}/stack.yaml", body)
             write(self.root, f"stacks/{stack}/achievements.json", json.dumps(
                 {"definitions": [{"id": f"{stack}-only", "scope": "stack", "stack": stack, "xp": 10}]}))
@@ -62,7 +65,7 @@ class Fixture(unittest.TestCase):
 
 class YamlSubset(unittest.TestCase):
     def test_nested_quotes_and_comments(self):
-        data = ll.parse_yaml_subset(STACK_YAML.format(id="python", ci=CI["python"]))
+        data = ll.parse_yaml_subset(STACK_YAML.format(id="python", ci=CI["python"], src="src"))
         self.assertEqual(data["marker"]["comment"], "# LEARNER: <hint>")
         self.assertEqual(data["ci"]["test_cmd"], "uv run --directory {dir} pytest -q")
         self.assertEqual(data["ci"]["test_glob"], r"(^|/)tests/.+\.py$")
@@ -126,6 +129,44 @@ class StackDetection(Fixture):
         cmd = ll.test_command("python", "projects/p2/python", ["test_loan"], set())
         self.assertEqual(cmd, ["bash", "-lc", "uv run --directory projects/p2/python pytest -q"])
         self.assertEqual(ll.test_command("ruby", "projects/p2/ruby", [], set())[2], "bundle exec rspec")
+
+
+class ProdAndStaging(Fixture):
+    def test_prod_files_per_stack(self):
+        prod = {
+            "java": "projects/p2-x/java/src/main/java/com/acme/Loan.java",
+            "python": "projects/p2-x/python/src/loan.py",
+            "node": "projects/p2-x/node/src/loan.ts",
+            "dotnet": "projects/p2-x/dotnet/src/Loan.cs",
+            "ruby": "projects/p2-x/ruby/lib/loan.rb",
+        }
+        for stack, path in prod.items():
+            with self.subTest(stack=stack):
+                self.assertTrue(ll.is_prod_file(stack, path), path)
+        self.assertFalse(ll.is_prod_file("python", "projects/p2-x/python/tests/test_loan.py"))
+        self.assertFalse(ll.is_prod_file("python", "projects/p2-x/python/PLAN.md"))
+        self.assertFalse(ll.is_prod_file("ruby", "projects/p2-x/ruby/spec/loan_spec.rb"))
+
+    def test_legacy_java_prod_file(self):
+        self.assertTrue(ll.is_prod_file("java", "projects/p1-loan-core-java8/src/main/java/nl/acme/Money.java"))
+
+    def test_session_test_path_filter(self):
+        yes = [
+            "projects/p1-loan-core-java8/src/test/java/nl/acme/MoneyTest.java",
+            "projects/p1-loan-core-java8/src/test/resources/vectors.json",  # java: fixtures staged as before
+            "projects/p2-x/python/tests/test_loan.py",
+            "projects/p2-x/ruby/spec/loan_spec.rb",
+        ]
+        no = [
+            "projects/p2-x/python/src/loan.py",
+            "projects/p2-x/python/PLAN.md",
+            "infra/docker/README.md",
+            "projects/p1-loan-core-java8/src/main/java/nl/acme/Money.java",
+        ]
+        for path in yes:
+            self.assertTrue(ll.is_session_test_path(path), path)
+        for path in no:
+            self.assertFalse(ll.is_session_test_path(path), path)
 
 
 class MissingCiBlock(Fixture):

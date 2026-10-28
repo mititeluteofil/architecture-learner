@@ -246,6 +246,30 @@ def is_test_file(stack, path):
     return True
 
 
+def is_prod_file(stack, path):
+    """True when `path` is production source of `stack` (under the pack's `layout.src`). Java keeps `/src/main/`."""
+    if stack == "java":
+        return "/src/main/" in path
+    src = load_stack(stack).get("layout", {}).get("src") if isinstance(load_stack(stack).get("layout"), dict) else None
+    if not src:
+        return False
+    hit = detect_stack(path)
+    if not hit or hit[0] != stack:
+        return False
+    rel = path[len(hit[1]):].lstrip("/")
+    return rel == src or rel.startswith(src.rstrip("/") + "/")
+
+
+def is_session_test_path(path):
+    """Test file of whichever stack owns `path` (Java: anything under `src/test/`, fixtures included)."""
+    hit = detect_stack(path)
+    if not hit:
+        return False
+    if hit[0] == "java":
+        return "/src/test/" in path
+    return is_test_file(hit[0], path)
+
+
 def test_command(stack, module, tests, registered):
     """argv used to run one module's tests (None when the pack declares no ci.test_cmd). Java keeps exact Maven."""
     if stack == "java":
@@ -391,6 +415,27 @@ def resolve_base(cli_base, head):
 def module_of(test_path):
     hit = detect_stack(test_path)
     return hit[1] if hit else None
+
+
+def cmd_changed_projects(args):
+    """Project folders whose production code changed between --base and --head (any stack)."""
+    changed = git("diff", "--name-only", args.base, args.head, "--", "projects").stdout.split()
+    folders = set()
+    for path in changed:
+        hit = detect_stack(path)
+        if hit and is_prod_file(hit[0], path):
+            folders.add(path.split("/")[1])
+    value = ",".join(sorted(folders))
+    set_output("projects", value)
+    print(value)
+
+
+def cmd_filter_tests(_args):
+    """Reads paths on stdin, prints those that are test files of their stack (used to stage test skeletons)."""
+    for line in sys.stdin.read().splitlines():
+        path = line.strip()
+        if path and is_session_test_path(path):
+            print(path)
 
 
 def cmd_detect_stacks(args):
@@ -964,6 +1009,11 @@ def main():
     p.add_argument("--head", default="HEAD")
     p.add_argument("--config-only", action="store_true")
     p.set_defaults(func=cmd_detect_stacks)
+    p = sub.add_parser("changed-projects")
+    p.add_argument("--base", required=True)
+    p.add_argument("--head", default="HEAD")
+    p.set_defaults(func=cmd_changed_projects)
+    sub.add_parser("filter-tests").set_defaults(func=cmd_filter_tests)
     p = sub.add_parser("session-tests")
     p.add_argument("--base", default="")
     p.add_argument("--head", default="HEAD")
